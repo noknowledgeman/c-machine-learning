@@ -1,0 +1,202 @@
+#include <math.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <assert.h>
+
+#define MATRIX_IMPLEMENTATION
+#include "matrix.h"
+
+#define IMAGE_SIZE 28*28
+
+typedef uint8_t u8;
+typedef uint32_t u32;
+
+// row_major
+typedef struct {
+    u8 data[IMAGE_SIZE];
+} Image;
+
+typedef struct {
+    Image image;
+} LabelledImage;
+
+// easier for now
+typedef struct {
+    Image *images;
+    u8 *labels;
+    u32 num_images;
+} LabelledImages;
+
+u32 swap32(u32 x) {
+    return ((x >> 24) & 0x000000FF) |
+           ((x >> 8)  & 0x0000FF00) |
+           ((x << 8)  & 0x00FF0000) |
+           ((x << 24) & 0xFF000000);
+}
+
+// the length of the image and the label file should be the same
+// You own the array
+// returns sucess == 1
+int decodeImages(LabelledImages *labelled_images, const char *images, const char *labels) {
+    // read images
+    FILE *image_file = fopen(images, "r");
+    
+    if (fgetc(image_file) != 0) return 0;
+    if (fgetc(image_file) != 0) return 0;
+    
+    u8 type = fgetc(image_file);
+    if (type != 0x08) return 0;
+    u8 num_dims = fgetc(image_file);
+    if (num_dims != 0x03) return 0;
+    printf("type: %d, dimensions: %d\n", type, num_dims);
+    
+    u32 dimensions[3] = {0};
+    fread(dimensions, sizeof(int), 3, image_file);
+    for (int i =0; i < 3; i++) {
+        dimensions[i] = swap32(dimensions[i]);
+    }
+    
+    printf("dimensions: (%d, %d, %d)\n", dimensions[0], dimensions[1], dimensions[2]);
+    
+    labelled_images->images = malloc(dimensions[0]*dimensions[1]*dimensions[2]);
+    if (labelled_images->images == NULL) return 0;
+    fread(labelled_images->images, 1, dimensions[0]*dimensions[1]*dimensions[2], image_file);
+    fclose(image_file);
+    
+    // read images
+    FILE *label_file = fopen(labels, "r");
+    
+    if (fgetc(label_file) != 0) return 0;
+    if (fgetc(label_file) != 0) return 0;
+    
+    type = fgetc(label_file);
+    if (type != 0x08) return 0;
+    num_dims = fgetc(label_file);
+    if (num_dims != 0x01) return 0;
+    printf("Labels type: %d, dimensions: %d\n", type, num_dims);
+    
+    u32 label_dimension;
+    fread(&label_dimension, sizeof(int), 1, label_file);
+    label_dimension = swap32(label_dimension);
+    
+    printf("label_dimension: %d\n", label_dimension);
+    
+    labelled_images->labels = malloc(label_dimension);
+    fread(labelled_images->labels, 1, label_dimension, label_file);
+    fclose(label_file);
+    
+    labelled_images->num_images = label_dimension;
+    
+    return 1;
+}
+
+void freeLabelledImages(LabelledImages images) {
+    free(images.images);
+    free(images.labels);
+}
+ 
+void showImage(Image *image) {
+    const char options[9] = " .:+=x$#";
+    for (int i = 0; i < 28; i++) {
+        printf("=");
+    }
+    printf("\n");
+    for (int i = 0; i < 28; i++) {
+        for (int j = 0; j < 28; j++) {
+            u8 idx = (image->data[28*i + j])/32;
+            printf("%c", options[idx]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// -------------------------------------------------------- Machine Learnign
+
+typedef struct Layer {
+    Matrix weights;
+    Matrix biases;
+} Layer;
+
+// Cross entropy
+float loss(Matrix learned, int real) {
+    if (learned.cols != 1 && learned.rows != 10) {
+        return -1.0f;
+    }
+    
+    return -logf(learned.data[real]);
+}
+
+void printMatrix(Matrix mat) {
+    for (int i = 0; i < mat.rows; i++) {
+        for (int j = 0; j < mat.cols; j++) {
+            printf("%5.1f ", mat.data[i*mat.cols + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+int main() {
+    LabelledImages training_images;
+    if (!decodeImages(&training_images, "./mnist/train-images.idx3-ubyte", "./mnist/train-labels.idx1-ubyte")) {
+        printf("Error when reading the file");
+        return 1;
+    }
+    LabelledImages test_images;
+    if (!decodeImages(&test_images, "./mnist/t10k-images.idx3-ubyte", "./mnist/t10k-labels.idx1-ubyte")) {
+        printf("Error when reading the file");
+        return 1;
+    }
+    
+    // showing a random image
+    srand(time(NULL));
+    u32 idx = (rand() % training_images.num_images);
+    Image *image = training_images.images + idx;
+    printf("label: %d\n", training_images.labels[idx]);
+    showImage(image);
+    
+    // implementing an MLP]
+    // so there will be 3 layers 28*28 -> 256 -> 128 -> 10
+    
+    Matrix weights;
+    assert(matCreate(&weights, 10, 28*28) == 0);    
+    
+    Matrix biases;
+    assert(matCreate(&biases, 10, 1) == 0);    
+    
+    for (int i = 0; i < weights.cols*weights.rows; i++) {
+        weights.data[i] = (float)rand()/(float)RAND_MAX;
+    }
+    
+    Matrix in;
+    assert(matCreate(&in, IMAGE_SIZE, 1) == 0);
+    
+    for (int i = 0; i < IMAGE_SIZE; i++) {
+        in.data[i] = (float)image->data[i]/255.0;
+    }
+    
+    Matrix out;
+    assert(matCreate(&out, 10, 1) == 0);
+    assert(matMul(&out, weights, in) == 0);
+    assert(matAdd(&out, out, biases) == 0);
+    
+    matSoftMax(&out, out);
+    printMatrix(out);
+    
+    int max_idx;
+    float curr_max;
+    for (int i = 0; i < 10; i++) {
+        if (curr_max < out.data[i]) {
+            curr_max = out.data[i];
+            max_idx = i;
+        }
+    }
+    printf("Found %d\n", max_idx);
+    
+    freeLabelledImages(training_images);
+    freeLabelledImages(test_images);
+    return 0;
+}
