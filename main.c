@@ -7,11 +7,11 @@
 
 #define MATRIX_IMPLEMENTATION
 #include "matrix.h"
+#include "types.h"
+#include "neuralnetwork.h"
 
 #define IMAGE_SIZE 28*28
 
-typedef uint8_t u8;
-typedef uint32_t u32;
 
 // row_major
 typedef struct {
@@ -50,7 +50,7 @@ int decodeImages(LabelledImages *labelled_images, const char *images, const char
     if (type != 0x08) return 0;
     u8 num_dims = fgetc(image_file);
     if (num_dims != 0x03) return 0;
-    printf("type: %d, dimensions: %d\n", type, num_dims);
+    // printf("type: %d, dimensions: %d\n", type, num_dims);
     
     u32 dimensions[3] = {0};
     fread(dimensions, sizeof(int), 3, image_file);
@@ -58,7 +58,7 @@ int decodeImages(LabelledImages *labelled_images, const char *images, const char
         dimensions[i] = swap32(dimensions[i]);
     }
     
-    printf("dimensions: (%d, %d, %d)\n", dimensions[0], dimensions[1], dimensions[2]);
+    // printf("dimensions: (%d, %d, %d)\n", dimensions[0], dimensions[1], dimensions[2]);
     
     labelled_images->images = malloc(dimensions[0]*dimensions[1]*dimensions[2]);
     if (labelled_images->images == NULL) return 0;
@@ -75,13 +75,13 @@ int decodeImages(LabelledImages *labelled_images, const char *images, const char
     if (type != 0x08) return 0;
     num_dims = fgetc(label_file);
     if (num_dims != 0x01) return 0;
-    printf("Labels type: %d, dimensions: %d\n", type, num_dims);
+    // printf("Labels type: %d, dimensions: %d\n", type, num_dims);
     
     u32 label_dimension;
     fread(&label_dimension, sizeof(int), 1, label_file);
     label_dimension = swap32(label_dimension);
     
-    printf("label_dimension: %d\n", label_dimension);
+    // printf("label_dimension: %d\n", label_dimension);
     
     labelled_images->labels = malloc(label_dimension);
     fread(labelled_images->labels, 1, label_dimension, label_file);
@@ -115,11 +115,6 @@ void showImage(Image *image) {
 
 // -------------------------------------------------------- Machine Learnign
 
-typedef struct Layer {
-    Matrix weights;
-    Matrix biases;
-} Layer;
-
 // Cross entropy
 float loss(Matrix learned, int real) {
     if (learned.cols != 1 && learned.rows != 10) {
@@ -127,16 +122,6 @@ float loss(Matrix learned, int real) {
     }
     
     return -logf(learned.data[real]);
-}
-
-void printMatrix(Matrix mat) {
-    for (int i = 0; i < mat.rows; i++) {
-        for (int j = 0; j < mat.cols; j++) {
-            printf("%5.1f ", mat.data[i*mat.cols + j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
 }
 
 int main() {
@@ -161,33 +146,30 @@ int main() {
     // implementing an MLP]
     // so there will be 3 layers 28*28 -> 256 -> 128 -> 10
     
-    Matrix weights;
-    assert(matCreate(&weights, 10, 28*28) == 0);    
+    NeuralNetwork network;
+    // just a one layer network with output 10
+    nnCreate(&network, 28*28, 1, 10);
     
-    Matrix biases;
-    assert(matCreate(&biases, 10, 1) == 0);    
-    
-    for (int i = 0; i < weights.cols*weights.rows; i++) {
-        weights.data[i] = (float)rand()/(float)RAND_MAX;
+    Layer layer = network.layers[0];
+    for (int i = 0; i < layer.weights.cols*layer.weights.rows; i++) {
+        layer.weights.data[i] = (float)rand()/(float)RAND_MAX;
     }
     
-    Matrix in;
-    assert(matCreate(&in, IMAGE_SIZE, 1) == 0);
+    Matrix in = matCreate(IMAGE_SIZE, 1);
     
     for (int i = 0; i < IMAGE_SIZE; i++) {
         in.data[i] = (float)image->data[i]/255.0;
     }
     
-    Matrix out;
-    assert(matCreate(&out, 10, 1) == 0);
-    assert(matMul(&out, weights, in) == 0);
-    assert(matAdd(&out, out, biases) == 0);
+    Matrix out = matCreate(10, 1);
+    
+    assert(nnForward(&network, &out, in) == 0);
     
     matSoftMax(&out, out);
-    printMatrix(out);
+    matDebug(out);
     
     int max_idx;
-    float curr_max;
+    float curr_max = -1.0;
     for (int i = 0; i < 10; i++) {
         if (curr_max < out.data[i]) {
             curr_max = out.data[i];
@@ -198,5 +180,10 @@ int main() {
     
     freeLabelledImages(training_images);
     freeLabelledImages(test_images);
+    
+    matDestroy(in);
+    matDestroy(out);
+    nnDestroy(&network);
+    
     return 0;
 }

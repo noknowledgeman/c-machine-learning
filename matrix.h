@@ -7,9 +7,11 @@ typedef struct Matrix {
     float *data;
 } Matrix;
 
+#ifndef MATRIX_IMPLEMENTATION
+
 // return 0 on success 1 otherwise
 // 0 initialized
-int matCreate(Matrix *out, unsigned int rows, unsigned int cols);
+Matrix matCreate(unsigned int rows, unsigned int cols);
 void matDestroy(Matrix a);
 
 int matMul(Matrix *out, Matrix a, Matrix b);
@@ -20,24 +22,26 @@ int matTranspose(Matrix *out, Matrix a);
 // not sure how to implement it yet
 int matSoftMax(Matrix *out, Matrix a);
 
-#ifdef MATRIX_IMPLEMENTATION
+void matDebug(Matrix a);
+
+#else
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 
-int matCreate(Matrix *out, unsigned int rows, unsigned int cols) {
+Matrix matCreate(unsigned int rows, unsigned int cols) {
     float *data = (float *)calloc(rows*cols, sizeof(float));
+    
     if (data == NULL) {
-        return 1;
+        return (Matrix) {0};
     }
     
-    *out = (Matrix){
+    return (Matrix){
         .rows = rows, 
         .cols = cols,
         .data = data,
     };
-    return 0;
 }
 
 void matDestroy(Matrix a) {
@@ -116,6 +120,16 @@ int matSoftMax(Matrix *out, Matrix a) {
     }
     
     return 0;
+}
+
+void matDebug(Matrix mat) {
+    for (int i = 0; i < mat.rows; i++) {
+        for (int j = 0; j < mat.cols; j++) {
+            printf("%5.1f ", mat.data[i*mat.cols + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
 }
 
 #endif
