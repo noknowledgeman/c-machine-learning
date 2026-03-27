@@ -7,7 +7,6 @@ typedef struct Matrix {
     float *data;
 } Matrix;
 
-#define MATRIX_IMPLEMENTATION
 #ifndef MATRIX_IMPLEMENTATION
 
 // return 0 on success 1 otherwise
