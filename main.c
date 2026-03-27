@@ -137,52 +137,67 @@ int main() {
     }
     
     // showing a random image
-    srand(time(NULL));
-    u32 idx = (rand() % training_images.num_images);
-    Image *image = training_images.images + idx;
-    printf("label: %d\n", training_images.labels[idx]);
-    showImage(image);
+    // srand(time(NULL));
+    // u32 idx = (rand() % training_images.num_images);
+    // Image *image = training_images.images + idx;
+    // printf("label: %d\n", training_images.labels[idx]);
+    // showImage(image);
     
     // implementing an MLP]
     // so there will be 3 layers 28*28 -> 256 -> 128 -> 10
     
-    NeuralNetwork network;
+    NeuralNetwork network = {0};
     // just a one layer network with output 10
     nnCreate(&network, 28*28, 1, 10);
     
+    // randomm init
     Layer layer = network.layers[0];
     for (int i = 0; i < layer.weights.cols*layer.weights.rows; i++) {
         layer.weights.data[i] = (float)rand()/(float)RAND_MAX;
     }
     
+    
     Matrix in = matCreate(IMAGE_SIZE, 1);
-    
-    for (int i = 0; i < IMAGE_SIZE; i++) {
-        in.data[i] = (float)image->data[i]/255.0;
-    }
-    
     Matrix out = matCreate(10, 1);
-    
-    assert(nnForward(&network, &out, in) == 0);
-    
-    matSoftMax(&out, out);
-    matDebug(out);
-    
-    int max_idx;
-    float curr_max = -1.0;
-    for (int i = 0; i < 10; i++) {
-        if (curr_max < out.data[i]) {
-            curr_max = out.data[i];
-            max_idx = i;
+    for (int i = 0; i < 5; i++) {
+        // choosing the image
+        Image *image = training_images.images + i;
+        u32 label = training_images.labels[i];
+        printf("Label: %ud\n", label);
+        showImage(image);
+        
+        // flattening the image
+        for (int j = 0; j < IMAGE_SIZE; j++) {
+            in.data[i] = (float)image->data[i]/255.0;
         }
+        
+        matDebug(out);
+        assert(nnForward(&network, &out, in) == 0);
+        
+        matDebug(out);
+        
+        int max_idx;
+        float curr_max = -1.0;
+        for (int i = 0; i < 10; i++) {
+            if (curr_max < out.data[i]) {
+                curr_max = out.data[i];
+                max_idx = i;
+            }
+        }
+        printf("Found %d\n", max_idx);
+        
+        Matrix actual = matCreate(10, 1);
+        actual.data[label] = 1.0;
+        assert(nnBackward(&network, actual, 0.001) == 0);
+        matDestroy(&actual);
     }
-    printf("Found %d\n", max_idx);
+    
     
     freeLabelledImages(training_images);
     freeLabelledImages(test_images);
     
-    matDestroy(in);
-    matDestroy(out);
+    matDestroy(&in);
+    matDestroy(&out);
     nnDestroy(&network);
     
     return 0;

@@ -16,3 +16,8 @@ A neural network implementation in C used as a form to learn neural networks, gr
 ```bash
 make
 ```
+> this only works if you have the mnist dataset in a directory called mnist in the right format of idxn-ubyte. See the main.c file for the right file names.
+
+# Resources
+
+A great help to understand Backpropagation was [Neural Networks](http://neuralnetworksanddeeplearning.com/chap2.html)

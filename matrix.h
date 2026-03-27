@@ -7,13 +7,13 @@ typedef struct Matrix {
     float *data;
 } Matrix;
 
-// #define MATRIX_IMPLEMENTATION
+#define MATRIX_IMPLEMENTATION
 #ifndef MATRIX_IMPLEMENTATION
 
 // return 0 on success 1 otherwise
 // 0 initialized
 Matrix matCreate(unsigned int rows, unsigned int cols);
-void matDestroy(Matrix a);
+void matDestroy(Matrix *a);
 Matrix matCopy(Matrix a);
 
 int matMul(Matrix *out, Matrix a, Matrix b);
@@ -22,7 +22,7 @@ int matAdd(Matrix *out, Matrix a, Matrix b);
 int matSub(Matrix *out, Matrix a, Matrix b);
 int matTranspose(Matrix *out, Matrix a);
 // [a, b]prod[d, e] = [a*d, b*e]
-int matProduct(Matrix *out, Matrix a);
+int matProduct(Matrix *out, Matrix a, Matrix b);
 
 // not sure how to implement it yet
 int matSoftMax(Matrix *out, Matrix a);
@@ -39,6 +39,7 @@ void matDebug(Matrix a);
 #include <math.h>
 #include <string.h>
 
+// zero-initialized
 Matrix matCreate(unsigned int rows, unsigned int cols) {
     float *data = (float *)calloc(rows*cols, sizeof(float));
     
@@ -53,15 +54,13 @@ Matrix matCreate(unsigned int rows, unsigned int cols) {
     };
 }
 
-void matDestroy(Matrix a) {
-    free(a.data);
+void matDestroy(Matrix *a) {
+    if (a->data != NULL) free(a->data);
+    a->data = NULL;
 }
 
 Matrix matCopy(Matrix a) {
-    Matrix ret = {
-        .rows = a.rows,
-        .cols = a.cols,
-    };
+    Matrix ret = matCreate(a.rows, a.cols);
     
     memcpy(ret.data, a.data, a.rows*a.cols*sizeof(float));
     return ret;
