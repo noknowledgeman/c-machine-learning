@@ -7,20 +7,28 @@ typedef struct Matrix {
     float *data;
 } Matrix;
 
+// #define MATRIX_IMPLEMENTATION
 #ifndef MATRIX_IMPLEMENTATION
 
 // return 0 on success 1 otherwise
 // 0 initialized
 Matrix matCreate(unsigned int rows, unsigned int cols);
 void matDestroy(Matrix a);
+Matrix matCopy(Matrix a);
 
 int matMul(Matrix *out, Matrix a, Matrix b);
+int matScale(Matrix *out, Matrix a, int r);
 int matAdd(Matrix *out, Matrix a, Matrix b);
-int matReLu(Matrix *out, Matrix a);
+int matSub(Matrix *out, Matrix a, Matrix b);
 int matTranspose(Matrix *out, Matrix a);
+// [a, b]prod[d, e] = [a*d, b*e]
+int matProduct(Matrix *out, Matrix a);
 
 // not sure how to implement it yet
 int matSoftMax(Matrix *out, Matrix a);
+
+int matReLu(Matrix *out, Matrix a);
+int matReLuDer(Matrix *out, Matrix a);
 
 void matDebug(Matrix a);
 
@@ -29,6 +37,7 @@ void matDebug(Matrix a);
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 Matrix matCreate(unsigned int rows, unsigned int cols) {
     float *data = (float *)calloc(rows*cols, sizeof(float));
@@ -38,14 +47,24 @@ Matrix matCreate(unsigned int rows, unsigned int cols) {
     }
     
     return (Matrix){
-        .rows = rows, 
-        .cols = cols,
+        .rows = (int)rows, 
+        .cols = (int)cols,
         .data = data,
     };
 }
 
 void matDestroy(Matrix a) {
     free(a.data);
+}
+
+Matrix matCopy(Matrix a) {
+    Matrix ret = {
+        .rows = a.rows,
+        .cols = a.cols,
+    };
+    
+    memcpy(ret.data, a.data, a.rows*a.cols*sizeof(float));
+    return ret;
 }
 
 // out should be initialized to the right size
@@ -72,6 +91,16 @@ int matMul(Matrix *out, Matrix a, Matrix b) {
     return 0;
 }
 
+int matScale(Matrix *out, Matrix a, int b) {
+    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    
+    for (int i = 0; i < a.cols*a.rows; i++) {
+        out->data[i] = b*a.data[i];
+    }
+    
+    return 0;
+}
+
 int matAdd(Matrix *out, Matrix a, Matrix b) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
     if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
@@ -80,6 +109,12 @@ int matAdd(Matrix *out, Matrix a, Matrix b) {
         out->data[i] = a.data[i] + b.data[i];
     }
     
+    return 0;
+}
+
+// might fail and change the out
+int matSub(Matrix *out, Matrix a, Matrix b) {
+    if (matScale(out, b, -1) != 0 || matAdd(out, a, *out) != 0) return 1;
     return 0;
 }
 
@@ -95,6 +130,17 @@ int matTranspose(Matrix *out, Matrix a) {
     return 0;
 }
 
+int matProduct(Matrix *out, Matrix a, Matrix b) {
+    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
+    
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = a.data[i]*b.data[i];
+    }
+    
+    return 0;
+}
+
 int matReLu(Matrix *out, Matrix a) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
     
@@ -104,7 +150,16 @@ int matReLu(Matrix *out, Matrix a) {
     return 0;
 }
 
-// not sure how to implement it yet
+int matReLuDer(Matrix *out, Matrix a) {
+    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = (a.data[i] > 0) ? 1 : 0;
+    }
+    
+    return 0;
+}
+
 int matSoftMax(Matrix *out, Matrix a) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
     
