@@ -41,9 +41,10 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
     va_list args;
     va_start(args, num_layers);
     
-    for (int i = 0; i < num_layers; i++) {
+    for (int i = 0; i < (int)num_layers; i++) {
         u32 size = va_arg(args, u32);
         Matrix weights = matCreate(size, in_size);
+        in_size = size;
         
         network->layers[i].weights = weights;
         
@@ -134,8 +135,6 @@ static int nnAddGradients(NeuralNetwork *network, Layer *gradients, float learni
 }
 
 static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate) {
-    (void)network;
-    
     // output after soft max
     Matrix out = network->layers[network->num_layers-1].a;
     if (target.rows != out.rows && target.cols != out.cols) return 1; 
@@ -148,25 +147,34 @@ static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate
     if (matSub(&dL, out, target) != 0) return 1;
     ds[network->num_layers-1] = dL;
     
-    for (int l = network->num_layers-2; l >= 0; l++) {
+    for (int l = network->num_layers-2; l >= 0; l--) {
         Layer layer = network->layers[l];
         Layer next_layer = network->layers[l+1];
         
-        Matrix templ = matCreate(layer.weights.rows, layer.weights.cols);
-        if (templ.data == NULL) {
+        Matrix wT = matCreate(next_layer.weights.cols, next_layer.weights.rows);
+        if (wT.data == NULL) {
             printf("Could not create\n");
             return 1;
         }
-        
-        if (matTranspose(&templ, next_layer.weights) != 0) {
+
+        if (matTranspose(&wT, next_layer.weights) != 0) {
             printf("Could not transpose\n");
+            matDestroy(&wT);
             return 1;
         };
-        
-        if (matMul(&templ, templ, ds[l+1]) != 0) {
-            printf("Could not multiply\n");
+
+        Matrix templ = matCreate(wT.rows, ds[l+1].cols);
+        if (templ.data == NULL) {
+            matDestroy(&wT);
             return 1;
         }
+        if (matMul(&templ, wT, ds[l+1]) != 0) {
+            printf("Could not multiply\n");
+            matDestroy(&wT);
+            matDestroy(&templ);
+            return 1;
+        }
+        matDestroy(&wT);
         
         Matrix tempr = matCopy(layer.z);
         
@@ -187,18 +195,18 @@ static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate
         
         gradients[i].weights = matCopy(network->layers[i].weights);
         // this should be the weights
-        printf("weight size %d x %d\n", network->layers[i].weights.rows, network->layers->weights.cols);
-        printf("%d x %d mul %d x %d\n", network->layers[i].x.rows, network->layers[i].x.cols, ds[i].rows, ds[i].cols);
+        // printf("weight size %d x %d\n", network->layers[i].weights.rows, network->layers->weights.cols);
+        // printf("%d x %d mul %d x %d\n", network->layers[i].x.rows, network->layers[i].x.cols, ds[i].rows, ds[i].cols);
         
         // Idk the math yet
         for (int j = 0; j < network->layers[i].weights.rows; j++) {
             for (int k = 0; k < network->layers[i].weights.cols; k++) {
-                gradients[i].weights.data[j*gradients[i].weights.cols + k] = network->layers[i].x.data[k]*ds->data[j];
+                gradients[i].weights.data[j*gradients[i].weights.cols + k] = network->layers[i].x.data[k]*ds[i].data[j];
             }
         }
     }
     
-    printf("Found the gradients for the backpropagation!\n");
+    // printf("Found the gradients for the backpropagation!\n");
     
     if (nnAddGradients(network, gradients, learning_rate) != 0) return 1;
     

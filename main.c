@@ -1,5 +1,4 @@
 #include <math.h>
-#include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -150,47 +149,85 @@ int main() {
     // just a one layer network with output 10
     nnCreate(&network, 28*28, 1, 10);
     
-    // randomm init
+    // I dont know if xavier init or random init is better
+    // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     Layer layer = network.layers[0];
+    float scale = 1.0f / sqrtf((float)layer.weights.cols);
     for (int i = 0; i < layer.weights.cols*layer.weights.rows; i++) {
-        layer.weights.data[i] = (float)rand()/(float)RAND_MAX;
+        // random weight
+        layer.weights.data[i] = ((float)rand()/(float)RAND_MAX * 2.0f - 1.0f) * scale;
     }
     
     
+    // training
     Matrix in = matCreate(IMAGE_SIZE, 1);
     Matrix out = matCreate(10, 1);
-    for (int i = 0; i < 5; i++) {
-        // choosing the image
-        Image *image = training_images.images + i;
-        u32 label = training_images.labels[i];
-        printf("Label: %ud\n", label);
-        showImage(image);
-        
-        // flattening the image
-        for (int j = 0; j < IMAGE_SIZE; j++) {
-            in.data[i] = (float)image->data[i]/255.0;
-        }
-        
-        matDebug(out);
-        assert(nnForward(&network, &out, in) == 0);
-        
-        matDebug(out);
-        
-        int max_idx;
-        float curr_max = -1.0;
-        for (int i = 0; i < 10; i++) {
-            if (curr_max < out.data[i]) {
-                curr_max = out.data[i];
-                max_idx = i;
+    
+    int epochs = 5;
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        for (int i = 0; i < (int)training_images.num_images; i++) {
+            if (i%1000 == 0) {
+                printf("Epoch %d, Image %d\n", epoch, i);
             }
+            // printf("Epoch %d\n", i);
+            // choosing the image
+            Image *image = training_images.images + i;
+            u32 label = training_images.labels[i];
+            // printf("Label: %u\n", label);
+            // showImage(image);
+            
+            // flattening the image
+            for (int j = 0; j < IMAGE_SIZE; j++) {
+                in.data[j] = (float)image->data[j]/255.0;
+            }
+            
+            // matDebug(out);
+            assert(nnForward(&network, &out, in) == 0);
+            
+            // matDebug(out);
+            
+            // int max_idx;
+            // float curr_max = -1.0;
+            // for (int i = 0; i < 10; i++) {
+            //     if (curr_max < out.data[i]) {
+            //         curr_max = out.data[i];
+            //         max_idx = i;
+            //     }
+            // }
+            // printf("Found %d\n", max_idx);
+            
+            Matrix actual = matCreate(10, 1);
+            actual.data[label] = 1.0;
+            assert(nnBackward(&network, actual, 0.1) == 0);
+            matDestroy(&actual);
         }
-        printf("Found %d\n", max_idx);
+        //testing
         
-        Matrix actual = matCreate(10, 1);
-        actual.data[label] = 1.0;
-        assert(nnBackward(&network, actual, 0.001) == 0);
-        matDestroy(&actual);
+        int total_correct = 0;
+        for (int i = 0; i < (int)test_images.num_images; i++) {
+            Image *image = test_images.images + i;
+            u32 label = test_images.labels[i];
+            
+            // flattening the image
+            for (int j = 0; j < IMAGE_SIZE; j++) {
+                in.data[j] = (float)image->data[j]/255.0;
+            }
+            
+            assert(nnForward(&network, &out, in) == 0);
+            
+            u32 max_idx;
+            float curr_max = -1.0;
+            for (int i = 0; i < 10; i++) {
+                if (curr_max < out.data[i]) {
+                    curr_max = out.data[i];
+                    max_idx = i;
+                }
+            }
+            total_correct += (max_idx == (int)label);
+        }
+        printf("Epoch %d, This model is %f%% accurate\n", epoch, (float)total_correct/(float)test_images.num_images*100.0);
     }
+    
     
     
     freeLabelledImages(training_images);

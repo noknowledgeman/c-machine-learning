@@ -16,7 +16,7 @@ void matDestroy(Matrix *a);
 Matrix matCopy(Matrix a);
 
 int matMul(Matrix *out, Matrix a, Matrix b);
-int matScale(Matrix *out, Matrix a, int r);
+int matScale(Matrix *out, Matrix a, float r);
 int matAdd(Matrix *out, Matrix a, Matrix b);
 int matSub(Matrix *out, Matrix a, Matrix b);
 int matTranspose(Matrix *out, Matrix a);
@@ -89,7 +89,7 @@ int matMul(Matrix *out, Matrix a, Matrix b) {
     return 0;
 }
 
-int matScale(Matrix *out, Matrix a, int b) {
+int matScale(Matrix *out, Matrix a, float b) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
     
     for (int i = 0; i < a.cols*a.rows; i++) {
@@ -110,9 +110,12 @@ int matAdd(Matrix *out, Matrix a, Matrix b) {
     return 0;
 }
 
-// might fail and change the out
 int matSub(Matrix *out, Matrix a, Matrix b) {
-    if (matScale(out, b, -1) != 0 || matAdd(out, a, *out) != 0) return 1;
+    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = a.data[i] - b.data[i];
+    }
     return 0;
 }
 
@@ -160,18 +163,23 @@ int matReLuDer(Matrix *out, Matrix a) {
 
 int matSoftMax(Matrix *out, Matrix a) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
-    
+
+    float max_val = a.data[0];
+    for (int i = 1; i < a.rows*a.cols; i++) {
+        if (a.data[i] > max_val) max_val = a.data[i];
+    }
+
     float total = 0.0;
-    for (int i = 0; i < (int)a.rows*a.cols; i++) {
-        float curr = exp(a.data[i]);
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        float curr = exp(a.data[i] - max_val);
         out->data[i] = curr;
         total += curr;
     }
-    
-    for (int i = 0; i < (int)a.rows*a.cols; i++) {
+
+    for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] /= total;
     }
-    
+
     return 0;
 }
 
