@@ -20,12 +20,19 @@ With the Layers 28*28 -> 128 -> 10:
 
 - Epoch 1: 75.84% accurate
 
+With learning rate 0.01
+After 1 epoch 97%
+
+With the layers 28*28 -> 256 -> 128 -> 10
+
+After 5 epochs 97.6%
 
 ## TODO
 
 - [x] Backpropagation
 - [x] Shuffling
-- [ ] Different sized models
+- [x] Different sized models
+- [ ] Plotting accuracies
 - [ ] Batching
 - [ ] learning rate decay
 - [ ] pthreads
@@ -38,7 +45,7 @@ With the Layers 28*28 -> 128 -> 10:
 ## Running
 
 ```bash
-make
+make test
 ```
 > this only works if you have the mnist dataset in a directory called mnist in the right format of idxn-ubyte. See the main.c file for the right file names.
 

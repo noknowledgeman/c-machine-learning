@@ -124,6 +124,21 @@ void shuffleIndeces(u32 *indeces, u32 num_indeces) {
     }
 }
 
+const int PLOT_SIZE = 50;
+void plotAccuracies(float *accuracies, u32 num_epochs) {
+    for (int i = 0; i < num_epochs; i++) {
+        printf("Epoch %d: [", i);
+        int num_bars = (int)(accuracies[i] * PLOT_SIZE);
+        for (int j = 0; j < num_bars; j++) {
+            printf("=");
+        }
+        for (int j = num_bars; j < PLOT_SIZE; j++) {
+            printf(" ");
+        }
+        printf("]%f%%\n", accuracies[i]*100.0);
+    }
+}
+
 int main() {
     LabelledImages training_images;
     if (!decodeImages(&training_images, "./mnist/train-images.idx3-ubyte", "./mnist/train-labels.idx1-ubyte")) {
@@ -150,7 +165,7 @@ int main() {
     // Epochs
     // learnign rate
     // layers
-    // batchh size (1 right now)
+    // batchh size (1 rightfloat *accuracies now)
     // weight init
     // activations
     int epochs = 5;
@@ -158,8 +173,11 @@ int main() {
     
     
     NeuralNetwork network = {0};
+    NeuralNetwork gradients = {0};
+    
     // just a one layer network with output 10
-    nnCreate(&network, 28*28, 2, 128, 10);
+    nnCreate(&network, 28*28, 1, 10);
+    gradients.num_layers = network.num_layers;
     
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     for (int l = 0; l < network.num_layers; l++) {
@@ -173,6 +191,7 @@ int main() {
     // training
     Matrix in = matCreate(IMAGE_SIZE, 1);
     Matrix out = matCreate(10, 1);
+    float accuracies[epochs];
     
     u32 indeces[training_images.num_images];
     for (int i = 0; i < training_images.num_images; i++) {
@@ -217,7 +236,11 @@ int main() {
             
             Matrix actual = matCreate(10, 1);
             actual.data[label] = 1.0;
-            assert(nnBackward(&network, actual, learning_rate) == 0);
+            assert(nnBackward(&network, &gradients, actual, learning_rate) == 0);
+            
+            nnAddGradients(&network, &gradients, learning_rate);
+            nnDestroy(&gradients);
+            
             matDestroy(&actual);
         }
         //testing
@@ -244,11 +267,14 @@ int main() {
             }
             total_correct += (max_idx == (int)label);
         }
-        printf("Epoch %d, This model is %f%% accurate\n", epoch, (float)total_correct/(float)test_images.num_images*100.0);
+        float accuracy = (float)total_correct / (float)test_images.num_images;
+        accuracies[epoch] = accuracy;
+        printf("Epoch %d, This model is %f%% accurate\n", epoch, accuracy*100.0);
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     printf("Training took %f seconds\n", (float)(end_time.tv_sec - start_time.tv_sec) + (float)(end_time.tv_nsec - start_time.tv_nsec)/1e9);
     
+    plotAccuracies(accuracies, epochs);
     
     freeLabelledImages(training_images);
     freeLabelledImages(test_images);

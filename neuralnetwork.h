@@ -59,6 +59,32 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
     return 0;
 }
 
+static void nnDestroy(NeuralNetwork *network) {
+    for (int i = 0; i < network->num_layers; i++) {
+        Layer current = network->layers[i];
+        matDestroy(&current.biases);
+        matDestroy(&current.weights);
+        matDestroy(&current.x);
+        matDestroy(&current.z);
+        matDestroy(&current.a);
+    }
+}
+
+// Creates a 0 initialized NeuralNetwork struct with only the weights and biases initialized to act as the gradient struct
+static int nnEnsureGradientsSize(NeuralNetwork *network, NeuralNetwork *out) {
+    if (network->num_layers != out->num_layers) return 1;
+    for (int i = 0; i < network->num_layers; i++) {
+        if (network->layers[i].weights.rows != out->layers[i].weights.rows || network->layers[i].weights.cols != out->layers[i].weights.cols) return 1;
+        if (network->layers[i].biases.rows != out->layers[i].biases.rows || network->layers[i].biases.cols != out->layers[i].biases.cols) return 1;
+        
+        // out->layers[i].weights = matCreate(network->layers[i].weights.rows, network->layers[i].weights.cols);
+        // if (out->layers[i].weights.data == NULL) return 1;
+        // out->layers[i].biases = matCreate(network->layers[i].biases.rows, network->layers[i].biases.cols);
+        // if (out->layers[i].biases.data == NULL) return 1;
+    }
+    
+    return 0;
+}
 
 // in has to be the size of network->layers[0].weights.cols x 1 and out has to be 
 // the same size of network->weights[network->num_weights-a] x 1
@@ -119,16 +145,16 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
 }
 
 // layers has to have the same length of network->num_layers
-static int nnAddGradients(NeuralNetwork *network, Layer *gradients, float learning_rate) {
+static int nnAddGradients(NeuralNetwork *network, NeuralNetwork *gradients, float learning_rate) {
     for (int i = 0; i < network->num_layers; i++) {
         Layer n_layer = network->layers[i];
         
-        Matrix temp = matCopy(gradients[i].weights);
+        Matrix temp = matCopy(gradients->layers[i].weights);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.weights, n_layer.weights, temp) != 0) return 1;
         matDestroy(&temp);
         
-        temp = matCopy(gradients[i].biases);
+        temp = matCopy(gradients->layers[i].biases);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.biases, n_layer.biases, temp) != 0) return 1;
         matDestroy(&temp);
@@ -137,7 +163,7 @@ static int nnAddGradients(NeuralNetwork *network, Layer *gradients, float learni
     return 0;
 }
 
-static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate) {
+static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix target, float learning_rate) {
     // output after soft max
     Matrix out = network->layers[network->num_layers-1].a;
     if (target.rows != out.rows && target.cols != out.cols) return 1; 
@@ -190,13 +216,18 @@ static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate
     }
     
     // Will be directly added
-    Layer *gradients = (Layer *)malloc(sizeof(Layer)*network->num_layers);
+    // NeuralNetwork gradients = {0};
+    // if (nnEnsureGradientsSize(network, gradients) != 0) return 1;
+    if (gradients->num_layers != network->num_layers) {
+        fprintf(stderr, "The gradient does not have the same layers: %du %du\n", network->num_layers, gradients->num_layers);
+        return 1;
+    };
     
     for (int i = 0; i < network->num_layers; i++) {
         // copying for now
-        gradients[i].biases = ds[i];
+        gradients->layers[i].biases = ds[i];
         
-        gradients[i].weights = matCopy(network->layers[i].weights);
+        gradients->layers[i].weights = matCopy(network->layers[i].weights);
         // this should be the weights
         // printf("weight size %d x %d\n", network->layers[i].weights.rows, network->layers->weights.cols);
         // printf("%d x %d mul %d x %d\n", network->layers[i].x.rows, network->layers[i].x.cols, ds[i].rows, ds[i].cols);
@@ -204,35 +235,20 @@ static int nnBackward(NeuralNetwork *network, Matrix target, float learning_rate
         // Idk the math yet
         for (int j = 0; j < network->layers[i].weights.rows; j++) {
             for (int k = 0; k < network->layers[i].weights.cols; k++) {
-                gradients[i].weights.data[j*gradients[i].weights.cols + k] = network->layers[i].x.data[k]*ds[i].data[j];
+                gradients->layers[i].weights.data[j*gradients->layers[i].weights.cols + k] = network->layers[i].x.data[k]*ds[i].data[j];
             }
         }
     }
     
-    // printf("Found the gradients for the backpropagation!\n");
     
-    if (nnAddGradients(network, gradients, learning_rate) != 0) return 1;
+    // if (nnAddGradients(network, &gradients, learning_rate) != 0) return 1;
     
-    // freeing the gradients
-    for (int i = 0; i < network->num_layers; i++) {
-        matDestroy(&gradients[i].weights);
-        matDestroy(&gradients[i].biases);
-    }
-    free(gradients);
+    // free(gradients);
+    // nnDestroy(&gradients);
     free(ds);
     
     return 0;
 }
 
-static void nnDestroy(NeuralNetwork *network) {
-    for (int i = 0; i < network->num_layers; i++) {
-        Layer current = network->layers[i];
-        matDestroy(&current.biases);
-        matDestroy(&current.weights);
-        matDestroy(&current.x);
-        matDestroy(&current.z);
-        matDestroy(&current.a);
-    }
-}
 
 #endif
