@@ -114,13 +114,13 @@ void showImage(Image *image) {
 
 // -------------------------------------------------------- Machine Learnign
 
-// Cross entropy
-float loss(Matrix learned, int real) {
-    if (learned.cols != 1 && learned.rows != 10) {
-        return -1.0f;
+void shuffleIndeces(u32 *indeces, u32 num_indeces) {
+    for (int i = 0; i < num_indeces; i++) {
+        int j = rand() % num_indeces;
+        u32 temp = indeces[i];
+        indeces[i] = indeces[j];
+        indeces[j] = temp;
     }
-    
-    return -logf(learned.data[real]);
 }
 
 int main() {
@@ -163,16 +163,23 @@ int main() {
     Matrix in = matCreate(IMAGE_SIZE, 1);
     Matrix out = matCreate(10, 1);
     
+    u32 indeces[training_images.num_images];
+    for (int i = 0; i < training_images.num_images; i++) {
+        indeces[i] = i;
+    }
+    
     int epochs = 5;
     for (int epoch = 0; epoch < epochs; epoch++) {
+        shuffleIndeces(indeces, training_images.num_images);
         for (int i = 0; i < (int)training_images.num_images; i++) {
+            
             if (i%1000 == 0) {
                 printf("Epoch %d, Image %d\n", epoch, i);
             }
             // printf("Epoch %d\n", i);
             // choosing the image
-            Image *image = training_images.images + i;
-            u32 label = training_images.labels[i];
+            Image *image = training_images.images + indeces[i];
+            u32 label = training_images.labels[indeces[i]];
             // printf("Label: %u\n", label);
             // showImage(image);
             

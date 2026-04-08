@@ -12,6 +12,10 @@ At current commit
 - After all training images 2 epochs accurcy 87.02%
 - After 5 epochs it has decreased to 87.1 from 88, probably because it is not being shuffled
 
+with shuffled indeces:
+
+- Epoch 0: 90.06%, Epoch 1: 90.33%, Epoch 5: 88.91% 
+
 ## TODO
 
 - [x] Backpropagation
