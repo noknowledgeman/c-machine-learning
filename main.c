@@ -1,3 +1,4 @@
+#include <time.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -145,19 +146,29 @@ int main() {
     // implementing an MLP]
     // so there will be 3 layers 28*28 -> 256 -> 128 -> 10
     
+    // hyper parameters
+    // Epochs
+    // learnign rate
+    // layers
+    // batchh size (1 right now)
+    // weight init
+    // activations
+    int epochs = 5;
+    float learning_rate = 0.01;
+    
+    
     NeuralNetwork network = {0};
     // just a one layer network with output 10
-    nnCreate(&network, 28*28, 1, 10);
+    nnCreate(&network, 28*28, 2, 128, 10);
     
-    // I dont know if xavier init or random init is better
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
-    Layer layer = network.layers[0];
-    float scale = 1.0f / sqrtf((float)layer.weights.cols);
-    for (int i = 0; i < layer.weights.cols*layer.weights.rows; i++) {
-        // random weight
-        layer.weights.data[i] = ((float)rand()/(float)RAND_MAX * 2.0f - 1.0f) * scale;
+    for (int l = 0; l < network.num_layers; l++) {
+        Layer *layer = &network.layers[l];
+        float scale = 1.0f / sqrtf((float)layer->weights.cols);
+        for (int i = 0; i < layer->weights.cols * layer->weights.rows; i++) {
+            layer->weights.data[i] = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f) * scale;
+        }
     }
-    
     
     // training
     Matrix in = matCreate(IMAGE_SIZE, 1);
@@ -168,7 +179,8 @@ int main() {
         indeces[i] = i;
     }
     
-    int epochs = 5;
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     for (int epoch = 0; epoch < epochs; epoch++) {
         shuffleIndeces(indeces, training_images.num_images);
         for (int i = 0; i < (int)training_images.num_images; i++) {
@@ -205,7 +217,7 @@ int main() {
             
             Matrix actual = matCreate(10, 1);
             actual.data[label] = 1.0;
-            assert(nnBackward(&network, actual, 0.1) == 0);
+            assert(nnBackward(&network, actual, learning_rate) == 0);
             matDestroy(&actual);
         }
         //testing
@@ -234,7 +246,8 @@ int main() {
         }
         printf("Epoch %d, This model is %f%% accurate\n", epoch, (float)total_correct/(float)test_images.num_images*100.0);
     }
-    
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    printf("Training took %f seconds\n", (float)(end_time.tv_sec - start_time.tv_sec) + (float)(end_time.tv_nsec - start_time.tv_nsec)/1e9);
     
     
     freeLabelledImages(training_images);

@@ -16,13 +16,24 @@ with shuffled indeces:
 
 - Epoch 0: 90.06%, Epoch 1: 90.33%, Epoch 5: 88.91% 
 
+With the Layers 28*28 -> 128 -> 10:
+
+- Epoch 1: 75.84% accurate
+
+
 ## TODO
 
 - [x] Backpropagation
-- [ ] Shuffling
+- [x] Shuffling
+- [ ] Different sized models
 - [ ] Batching
+- [ ] learning rate decay
+- [ ] pthreads
+- [ ] research optimizers
+- [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)
 - [ ] Different activation functions
 - [ ] Convolutional neural networksk
+- [ ] GPU acceleration
 
 ## Running
 

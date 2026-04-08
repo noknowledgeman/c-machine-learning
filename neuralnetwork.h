@@ -44,6 +44,7 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
     for (int i = 0; i < (int)num_layers; i++) {
         u32 size = va_arg(args, u32);
         Matrix weights = matCreate(size, in_size);
+        if (weights.data == NULL) return 1;
         in_size = size;
         
         network->layers[i].weights = weights;
@@ -75,10 +76,12 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
 // ```
 static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
     if (in.rows != network->layers[0].weights.cols || in.cols != 1) {
-        fprintf(stderr, "The input is not %ud x %d\n", network->layers[0].weights.cols, 1);
+        fprintf(stderr, "The input is not %u x %d\n", network->layers[0].weights.cols, 1);
+        return 1;
     }
     if (out->rows != network->layers[network->num_layers-1].weights.rows || out->cols != 1) {
-        fprintf(stderr, "The output is not %ud x %d\n", network->layers[network->num_layers-1].weights.rows, 1);
+        fprintf(stderr, "The output is not %u x %d\n", network->layers[network->num_layers-1].weights.rows, 1);
+        return 1;
     }
     
     for (int i = 0; i < network->num_layers; i++) {
