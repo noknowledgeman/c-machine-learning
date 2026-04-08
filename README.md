@@ -32,12 +32,13 @@ After 5 epochs 97.6%
 - [x] Backpropagation
 - [x] Shuffling
 - [x] Different sized models
-- [ ] Plotting accuracies
-- [ ] Batching
-- [ ] learning rate decay
-- [ ] pthreads
-- [ ] research optimizers
+- [x] Plotting accuracies
+- [x] Batching (semi)
+- [ ] Automatic dataset downloading
+- [ ] Momentum
+- [ ] Adam
 - [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)
+- [ ] pthreads
 - [ ] Different activation functions
 - [ ] Convolutional neural networksk
 - [ ] GPU acceleration
@@ -45,6 +46,7 @@ After 5 epochs 97.6%
 ## Running
 
 ```bash
+./datasets.sh mnist
 make test
 ```
 > this only works if you have the mnist dataset in a directory called mnist in the right format of idxn-ubyte. See the main.c file for the right file names.

@@ -139,27 +139,29 @@ void plotAccuracies(float *accuracies, u32 num_epochs) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    // shitty but just assum that if the argumetn count is 5 the first two arguments are the training images and the second two arguments are the test images
     LabelledImages training_images;
-    if (!decodeImages(&training_images, "./mnist/train-images.idx3-ubyte", "./mnist/train-labels.idx1-ubyte")) {
-        printf("Error when reading the file");
-        return 1;
-    }
     LabelledImages test_images;
-    if (!decodeImages(&test_images, "./mnist/t10k-images.idx3-ubyte", "./mnist/t10k-labels.idx1-ubyte")) {
-        printf("Error when reading the file");
-        return 1;
+    if (argc == 5) {
+        if (!decodeImages(&training_images, argv[1], argv[2])) {
+            printf("Error when reading the file");
+            return 1;
+        }
+        if (!decodeImages(&test_images, argv[3], argv[4])) {
+            printf("Error when reading the file");
+            return 1;
+        }
+    } else {
+        if (!decodeImages(&training_images, "./datasets/mnist/train-images.idx3-ubyte", "./datasets/mnist/train-labels.idx1-ubyte")) {
+            printf("Error when reading the file");
+            return 1;
+        }
+        if (!decodeImages(&test_images, "./datasets/mnist/t10k-images.idx3-ubyte", "./datasets/mnist/t10k-labels.idx1-ubyte")) {
+            printf("Error when reading the file");
+            return 1;
+        }
     }
-    
-    // showing a random image
-    // srand(time(NULL));
-    // u32 idx = (rand() % training_images.num_images);
-    // Image *image = training_images.images + idx;
-    // printf("label: %d\n", training_images.labels[idx]);
-    // showImage(image);
-    
-    // implementing an MLP]
-    // so there will be 3 layers 28*28 -> 256 -> 128 -> 10
     
     // hyper parameters
     // Epochs
@@ -169,15 +171,15 @@ int main() {
     // weight init
     // activations
     int epochs = 5;
-    float learning_rate = 0.01;
+    int batch_size = 32;
+    float learning_rate = 0.01*batch_size;
     
     
     NeuralNetwork network = {0};
     NeuralNetwork gradients = {0};
-    
+
     // just a one layer network with output 10
-    nnCreate(&network, 28*28, 1, 10);
-    gradients.num_layers = network.num_layers;
+    nnCreate(&network, 28*28, 3, 256, 128, 10);
     
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     for (int l = 0; l < network.num_layers; l++) {
@@ -191,6 +193,7 @@ int main() {
     // training
     Matrix in = matCreate(IMAGE_SIZE, 1);
     Matrix out = matCreate(10, 1);
+    Matrix actual = matCreate(10, 1);
     float accuracies[epochs];
     
     u32 indeces[training_images.num_images];
@@ -202,46 +205,38 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     for (int epoch = 0; epoch < epochs; epoch++) {
         shuffleIndeces(indeces, training_images.num_images);
-        for (int i = 0; i < (int)training_images.num_images; i++) {
-            
-            if (i%1000 == 0) {
-                printf("Epoch %d, Image %d\n", epoch, i);
+        for (int i = 0; i < (int)training_images.num_images/batch_size; i++) {
+            if (i % 100 == 0) {
+                printf("Epoch %d, Batch %d\n", epoch, i);
             }
-            // printf("Epoch %d\n", i);
-            // choosing the image
-            Image *image = training_images.images + indeces[i];
-            u32 label = training_images.labels[indeces[i]];
-            // printf("Label: %u\n", label);
-            // showImage(image);
-            
-            // flattening the image
-            for (int j = 0; j < IMAGE_SIZE; j++) {
-                in.data[j] = (float)image->data[j]/255.0;
+
+            assert(nnZeroGradients(&network, &gradients) == 0);
+
+            for (int j = 0; j < batch_size && i*batch_size + j < training_images.num_images; j++) {
+                NeuralNetwork batch_gradients = {0};
+                batch_gradients.num_layers = network.num_layers;
+
+                Image *image = training_images.images + indeces[i*batch_size + j];
+                u32 label = training_images.labels[indeces[i*batch_size + j]];
+
+                // flattening the image
+                for (int k = 0; k < IMAGE_SIZE; k++) {
+                    in.data[k] = (float)image->data[k]/255.0;
+                }
+                
+                assert(nnForward(&network, &out, in) == 0);
+                actual.data[label] = 1.0;
+                assert(nnBackward(&network, &batch_gradients, actual) == 0);
+                actual.data[label] = 0.0;
+                
+                nnAddGradients(&gradients, &batch_gradients);
+                nnDestroy(&batch_gradients);
             }
+            nnScaleGradients(&gradients, 1.0/batch_size);
             
-            // matDebug(out);
-            assert(nnForward(&network, &out, in) == 0);
-            
-            // matDebug(out);
-            
-            // int max_idx;
-            // float curr_max = -1.0;
-            // for (int i = 0; i < 10; i++) {
-            //     if (curr_max < out.data[i]) {
-            //         curr_max = out.data[i];
-            //         max_idx = i;
-            //     }
-            // }
-            // printf("Found %d\n", max_idx);
-            
-            Matrix actual = matCreate(10, 1);
-            actual.data[label] = 1.0;
-            assert(nnBackward(&network, &gradients, actual, learning_rate) == 0);
-            
-            nnAddGradients(&network, &gradients, learning_rate);
+            nnAddGradientsToNetwork(&network, &gradients, learning_rate);
             nnDestroy(&gradients);
             
-            matDestroy(&actual);
         }
         //testing
         
@@ -279,6 +274,7 @@ int main() {
     freeLabelledImages(training_images);
     freeLabelledImages(test_images);
     
+    matDestroy(&actual);
     matDestroy(&in);
     matDestroy(&out);
     nnDestroy(&network);
