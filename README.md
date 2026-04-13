@@ -27,6 +27,14 @@ With the layers 28*28 -> 256 -> 128 -> 10
 
 After 5 epochs 97.6%
 
+### Fashion MNIST
+
+Epoch 0: 72.439998%
+Epoch 1: 81.209999%
+Epoch 2: 81.569999%
+Epoch 3: 81.779999%
+Epoch 4: 82.330000%
+
 ## TODO
 
 - [x] Backpropagation
@@ -34,7 +42,7 @@ After 5 epochs 97.6%
 - [x] Different sized models
 - [x] Plotting accuracies
 - [x] Batching (semi)
-- [ ] Automatic dataset downloading
+- [x] Automatic dataset downloading
 - [ ] Momentum
 - [ ] Adam
 - [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)

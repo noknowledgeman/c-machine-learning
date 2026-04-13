@@ -124,7 +124,7 @@ void shuffleIndeces(u32 *indeces, u32 num_indeces) {
     }
 }
 
-const int PLOT_SIZE = 50;
+const int PLOT_SIZE = 80;
 void plotAccuracies(float *accuracies, u32 num_epochs) {
     for (int i = 0; i < num_epochs; i++) {
         printf("Epoch %d: [", i);
@@ -163,6 +163,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    // showImage(training_images.images);
     // hyper parameters
     // Epochs
     // learnign rate
@@ -179,7 +180,7 @@ int main(int argc, char *argv[]) {
     NeuralNetwork gradients = {0};
 
     // just a one layer network with output 10
-    nnCreate(&network, 28*28, 3, 256, 128, 10);
+    nnCreate(&network, 28*28, 1, 10);
     
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     for (int l = 0; l < network.num_layers; l++) {
