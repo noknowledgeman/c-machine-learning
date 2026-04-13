@@ -1,23 +1,24 @@
-CFLAGS = -fsanitize=address -pedantic -Wall -g
-FILES = main.c matrix.h neuralnetwork.h types.h
+CFLAGS =  -pedantic -Wall -g
+# All the SRCS with implementationn
+SRCS = main.c arena.h neuralnetwork.h matrix.h
 
-run: main
+run: build-main
 	./main
-	
-run-test: test
-	./test
 
-main: $(FILES)
-	gcc $(CFLAGS) -o main main.c -lm
+test: build-test
+	./test
 	
-test: $(FILES)
+build-main: $(SRCS)
+	gcc $(CFLAGS) -fsanitize=address -o main main.c -lm
+	
+build-test: $(SRCS)
 	gcc $(CFLAGS) -O3 -ffast-math -o test main.c -lm
 	
-leak: $(FILES)
+leak: $(SRCS)
 	gcc -pedantic -Wall -g -o leak main.c -lm
 	valgrind --leak-check=full ./leak
 	rm leak
 	
-.PHONY: clean
+.PHONY: clean leak build-test build-main main test
 clean:
 	rm -f main test leak

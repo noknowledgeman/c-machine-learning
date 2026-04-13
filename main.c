@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #define MATRIX_IMPLEMENTATION
 #include "matrix.h"
@@ -124,18 +126,25 @@ void shuffleIndeces(u32 *indeces, u32 num_indeces) {
     }
 }
 
-const int PLOT_SIZE = 80;
 void plotAccuracies(float *accuracies, u32 num_epochs) {
-    for (int i = 0; i < num_epochs; i++) {
+    // lazy execution and only once
+    static int term_width = -1;
+    if (term_width == -1)  {
+        struct winsize w;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0)
+            term_width = w.ws_col;
+    }
+
+    // "Epoch XX: [" = 11, "]100.000000%" = 13
+    int plot_size = term_width - 19;
+    if (plot_size < 1) plot_size = 1;
+
+    for (int i = 0; i < (int)num_epochs; i++) {
         printf("Epoch %d: [", i);
-        int num_bars = (int)(accuracies[i] * PLOT_SIZE);
-        for (int j = 0; j < num_bars; j++) {
-            printf("=");
-        }
-        for (int j = num_bars; j < PLOT_SIZE; j++) {
-            printf(" ");
-        }
-        printf("]%f%%\n", accuracies[i]*100.0);
+        int num_bars = (int)(accuracies[i] * plot_size);
+        for (int j = 0; j < num_bars; j++) printf("=");
+        for (int j = num_bars; j < plot_size; j++) printf(" ");
+        printf("]%.2f%%\n", accuracies[i]*100.0);
     }
 }
 
@@ -172,7 +181,7 @@ int main(int argc, char *argv[]) {
     // weight init
     // activations
     int epochs = 5;
-    int batch_size = 32;
+    int batch_size = 64;
     float learning_rate = 0.01*batch_size;
     
     
