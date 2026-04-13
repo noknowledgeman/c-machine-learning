@@ -1,19 +1,23 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include "arena.h"
 typedef struct Matrix {
     int rows;
     int cols;
     float *data;
 } Matrix;
 
-#ifndef MATRIX_IMPLEMENTATION
-
 // return 0 on success 1 otherwise
 // 0 initialized
 Matrix matCreate(unsigned int rows, unsigned int cols);
 void matDestroy(Matrix *a);
-Matrix matCopy(Matrix a);
+Matrix matDupe(Matrix a);
+
+// return 0 on success 1 otherwise
+// 0 initialized
+Matrix matArenaCreate(Arena *arena, unsigned int rows, unsigned int cols);
+Matrix matArenaDupe(Arena *arena, Matrix a);
 
 int matMul(Matrix *out, Matrix a, Matrix b);
 int matScale(Matrix *out, Matrix a, float r);
@@ -31,7 +35,8 @@ int matReLuDer(Matrix *out, Matrix a);
 
 void matDebug(Matrix a);
 
-#else
+// #define MATRIX_IMPLEMENTATION
+#ifdef MATRIX_IMPLEMENTATION
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,7 +63,28 @@ void matDestroy(Matrix *a) {
     a->data = NULL;
 }
 
-Matrix matCopy(Matrix a) {
+Matrix matDupe(Matrix a) {
+    Matrix ret = matCreate(a.rows, a.cols);
+    
+    memcpy(ret.data, a.data, a.rows*a.cols*sizeof(float));
+    return ret;
+}
+
+Matrix matArenaCreate(Arena *arena, unsigned int rows, unsigned int cols) {
+    float *data = (float *)aaArenaAlloc(arena, rows*cols*sizeof(float));
+    
+    if (data == NULL) {
+        return (Matrix) {0};
+    }
+    
+    return (Matrix){
+        .rows = (int)rows, 
+        .cols = (int)cols,
+        .data = data,
+    };
+}
+
+Matrix matArenaDupe(Arena *arena, Matrix a) {
     Matrix ret = matCreate(a.rows, a.cols);
     
     memcpy(ret.data, a.data, a.rows*a.cols*sizeof(float));

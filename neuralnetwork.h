@@ -148,7 +148,7 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
         
         // not great but avoids memory leak, might lead to false frees 
         matDestroy(&current->x);
-        current->x = matCopy(in);
+        current->x = matDupe(in);
         
         Matrix temp = matCreate(current->biases.rows, 1);
         if (temp.data == NULL) return 1;
@@ -156,7 +156,7 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
         if (matAdd(&temp, temp, current->biases) != 0) return 1;
         
         matDestroy(&current->z);
-        current->z = matCopy(temp);
+        current->z = matDupe(temp);
         
         // ReLu ever layer except the last, there is soft max
         if (i < network->num_layers - 1) {
@@ -165,7 +165,7 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
             matSoftMax(&temp, temp);
         }
         matDestroy(&current->a);
-        current->a = matCopy(temp);
+        current->a = matDupe(temp);
         
         // only frees it if it is not owned by the caller
         if (i != 0) matDestroy(&in);
@@ -182,12 +182,12 @@ static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradie
     for (int i = 0; i < network->num_layers; i++) {
         Layer n_layer = network->layers[i];
         
-        Matrix temp = matCopy(gradients->layers[i].weights);
+        Matrix temp = matDupe(gradients->layers[i].weights);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.weights, n_layer.weights, temp) != 0) return 1;
         matDestroy(&temp);
         
-        temp = matCopy(gradients->layers[i].biases);
+        temp = matDupe(gradients->layers[i].biases);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.biases, n_layer.biases, temp) != 0) return 1;
         matDestroy(&temp);
@@ -238,7 +238,7 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
         }
         matDestroy(&wT);
         
-        Matrix tempr = matCopy(layer->z);
+        Matrix tempr = matDupe(layer->z);
         
         if (matReLuDer(&tempr, tempr) != 0) return 1;
         
@@ -260,7 +260,7 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
         // copying for now
         gradients->layers[i].biases = ds[i];
         
-        gradients->layers[i].weights = matCopy(network->layers[i].weights);
+        gradients->layers[i].weights = matDupe(network->layers[i].weights);
         // this should be the weights
         // printf("weight size %d x %d\n", network->layers[i].weights.rows, network->layers->weights.cols);
         // printf("%d x %d mul %d x %d\n", network->layers[i].x.rows, network->layers[i].x.cols, ds[i].rows, ds[i].cols);

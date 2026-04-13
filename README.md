@@ -45,6 +45,7 @@ Epoch 4: 82.330000%
 - [x] Automatic dataset downloading
 - [ ] Momentum
 - [ ] Adam
+- [ ] Regularization
 - [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)
 - [ ] pthreads
 - [ ] Different activation functions
@@ -52,6 +53,8 @@ Epoch 4: 82.330000%
 - [ ] GPU acceleration
 
 ## Running
+
+Only works on linux so far, does not have any external dependencies other than the c standard library
 
 ```bash
 ./datasets.sh mnist
