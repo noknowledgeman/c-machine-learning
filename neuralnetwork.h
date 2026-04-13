@@ -2,6 +2,7 @@
 #ifndef NEURALNETWORK_H
 #define NEURALNETWORK_H
 
+#include "arena.h"
 #include "matrix.h"
 #include "types.h"
 #include <assert.h>
@@ -32,9 +33,8 @@ typedef struct {
     int num_layers;
 } NeuralNetwork;
 
-// at least two variadics, for now only ReLu and nothing at the end
-// num_layers >= 1;
-static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
+static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 num_layers, ...) {
+    
     network->num_layers = num_layers;
     if(num_layers > 5) return 1;
     
@@ -43,13 +43,13 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
     
     for (int i = 0; i < (int)num_layers; i++) {
         u32 size = va_arg(args, u32);
-        Matrix weights = matCreate(size, in_size);
+        Matrix weights = matArenaCreate(arena, size, in_size);
         if (weights.data == NULL) return 1;
         in_size = size;
         
         network->layers[i].weights = weights;
         
-        Matrix biases = matCreate(size, 1);
+        Matrix biases = matArenaCreate(arena,size, 1);
         if (biases.data == NULL) return 1;
         network->layers[i].biases = biases;
     }
@@ -59,44 +59,26 @@ static int nnCreate(NeuralNetwork *network, u32 in_size, u32 num_layers, ...) {
     return 0;
 }
 
-static void nnDestroy(NeuralNetwork *network) {
-    for (int i = 0; i < network->num_layers; i++) {
-        Layer *current = &network->layers[i];
-        matDestroy(&current->biases);
-        matDestroy(&current->weights);
-        matDestroy(&current->x);
-        matDestroy(&current->z);
-        matDestroy(&current->a);
-    }
-}
+// static void nnDestroy(NeuralNetwork *network) {
+//     for (int i = 0; i < network->num_layers; i++) {
+//         Layer *current = &network->layers[i];
+//         matDestroy(&current->biases);
+//         matDestroy(&current->weights);
+//         matDestroy(&current->x);
+//         matDestroy(&current->z);
+//         matDestroy(&current->a);
+//     }
+// }
 
 // Allocates zero-initialized weight and bias matrices for use as a gradient accumulator
-static int nnZeroGradients(NeuralNetwork *network, NeuralNetwork *gradients) {
+static int nnZeroGradients(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena) {
     gradients->num_layers = network->num_layers;
     for (int i = 0; i < network->num_layers; i++) {
-        matDestroy(&gradients->layers[i].weights);
-        gradients->layers[i].weights = matCreate(network->layers[i].weights.rows, network->layers[i].weights.cols);
+        gradients->layers[i].weights = matArenaCreate(arena, network->layers[i].weights.rows, network->layers[i].weights.cols);
         if (gradients->layers[i].weights.data == NULL) return 1;
-        matDestroy(&gradients->layers[i].biases);
-        gradients->layers[i].biases = matCreate(network->layers[i].biases.rows, network->layers[i].biases.cols);
+        gradients->layers[i].biases = matArenaCreate(arena, network->layers[i].biases.rows, network->layers[i].biases.cols);
         if (gradients->layers[i].biases.data == NULL) return 1;
     }
-    return 0;
-}
-
-// Creates a 0 initialized NeuralNetwork struct with only the weights and biases initialized to act as the gradient struct
-static int nnEnsureGradientsSize(NeuralNetwork *network, NeuralNetwork *out) {
-    if (network->num_layers != out->num_layers) return 1;
-    for (int i = 0; i < network->num_layers; i++) {
-        if (network->layers[i].weights.rows != out->layers[i].weights.rows || network->layers[i].weights.cols != out->layers[i].weights.cols) return 1;
-        if (network->layers[i].biases.rows != out->layers[i].biases.rows || network->layers[i].biases.cols != out->layers[i].biases.cols) return 1;
-        
-        // out->layers[i].weights = matCreate(network->layers[i].weights.rows, network->layers[i].weights.cols);
-        // if (out->layers[i].weights.data == NULL) return 1;
-        // out->layers[i].biases = matCreate(network->layers[i].biases.rows, network->layers[i].biases.cols);
-        // if (out->layers[i].biases.data == NULL) return 1;
-    }
-    
     return 0;
 }
 
@@ -133,7 +115,7 @@ static int nnAddGradients(NeuralNetwork *gradients, NeuralNetwork *batch_gradien
 //   int (*activationDer)(Matrix *, Matrix);
 // } Activation;
 // ```
-static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
+static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in, Arena *arena) {
     if (in.rows != network->layers[0].weights.cols || in.cols != 1) {
         fprintf(stderr, "The input is not %u x %d\n", network->layers[0].weights.cols, 1);
         return 1;
@@ -147,16 +129,14 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
         Layer *current = network->layers + i; 
         
         // not great but avoids memory leak, might lead to false frees 
-        matDestroy(&current->x);
-        current->x = matDupe(in);
+        current->x = matArenaDupe(arena, in);
         
-        Matrix temp = matCreate(current->biases.rows, 1);
+        Matrix temp = matArenaCreate(arena, current->biases.rows, 1);
         if (temp.data == NULL) return 1;
         if (matMul(&temp, current->weights, in) != 0) return 1;
         if (matAdd(&temp, temp, current->biases) != 0) return 1;
         
-        matDestroy(&current->z);
-        current->z = matDupe(temp);
+        current->z = matArenaDupe(arena, temp);
         
         // ReLu ever layer except the last, there is soft max
         if (i < network->num_layers - 1) {
@@ -164,48 +144,43 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in) {
         } else {
             matSoftMax(&temp, temp);
         }
-        matDestroy(&current->a);
-        current->a = matDupe(temp);
+        current->a = matArenaDupe(arena, temp);
         
         // only frees it if it is not owned by the caller
-        if (i != 0) matDestroy(&in);
         in = temp;
     }
     
     memcpy(out->data, in.data, out->cols*out->rows*sizeof(float));
-    matDestroy(&in);
     return 0;
 }
 
 // layers has to have the same length of network->num_layers
-static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradients, float learning_rate) {
+static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena,  float learning_rate) {
     for (int i = 0; i < network->num_layers; i++) {
         Layer n_layer = network->layers[i];
         
-        Matrix temp = matDupe(gradients->layers[i].weights);
+        Matrix temp = matArenaDupe(arena, gradients->layers[i].weights);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.weights, n_layer.weights, temp) != 0) return 1;
-        matDestroy(&temp);
         
-        temp = matDupe(gradients->layers[i].biases);
+        temp = matArenaDupe(arena, gradients->layers[i].biases);
         if (matScale(&temp, temp, learning_rate) != 0) return 1;
         if (matSub(&n_layer.biases, n_layer.biases, temp) != 0) return 1;
-        matDestroy(&temp);
     }
     
     return 0;
 }
 
-static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix target) {
+static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix target, Arena *arena) {
     // output after soft max
     Matrix out = network->layers[network->num_layers-1].a;
     if (target.rows != out.rows && target.cols != out.cols) return 1; 
     
     // focus on the weighs first, the array  of errors
-    Matrix *ds = (Matrix *)malloc(sizeof(Matrix)*network->num_layers);
+    Matrix *ds = (Matrix *)arenaAlloc(arena, sizeof(Matrix)*network->num_layers);
     
     // dL is the gradient of C with respect of the pre activation outputs on layer L, L is the last
-    Matrix dL = matCreate(target.rows, target.cols);
+    Matrix dL = matArenaCreate(arena, target.rows, target.cols);
     if (matSub(&dL, out, target) != 0) return 1;
     ds[network->num_layers-1] = dL;
     
@@ -213,7 +188,7 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
         Layer *layer = &network->layers[l];
         Layer *next_layer = &network->layers[l+1];
         
-        Matrix wT = matCreate(next_layer->weights.cols, next_layer->weights.rows);
+        Matrix wT = matArenaCreate(arena, next_layer->weights.cols, next_layer->weights.rows);
         if (wT.data == NULL) {
             printf("Could not create\n");
             return 1;
@@ -221,29 +196,23 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
 
         if (matTranspose(&wT, next_layer->weights) != 0) {
             printf("Could not transpose\n");
-            matDestroy(&wT);
             return 1;
         };
 
-        Matrix templ = matCreate(wT.rows, ds[l+1].cols);
+        Matrix templ = matArenaCreate(arena, wT.rows, ds[l+1].cols);
         if (templ.data == NULL) {
-            matDestroy(&wT);
             return 1;
         }
         if (matMul(&templ, wT, ds[l+1]) != 0) {
             printf("Could not multiply\n");
-            matDestroy(&wT);
-            matDestroy(&templ);
             return 1;
         }
-        matDestroy(&wT);
         
-        Matrix tempr = matDupe(layer->z);
+        Matrix tempr = matArenaDupe(arena, layer->z);
         
         if (matReLuDer(&tempr, tempr) != 0) return 1;
         
         if (matProduct(&templ, templ, tempr) != 0) return 1;
-        matDestroy(&tempr);
         
         ds[l] = templ;
     }
@@ -260,7 +229,7 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
         // copying for now
         gradients->layers[i].biases = ds[i];
         
-        gradients->layers[i].weights = matDupe(network->layers[i].weights);
+        gradients->layers[i].weights = matArenaDupe(arena, network->layers[i].weights);
         // this should be the weights
         // printf("weight size %d x %d\n", network->layers[i].weights.rows, network->layers->weights.cols);
         // printf("%d x %d mul %d x %d\n", network->layers[i].x.rows, network->layers[i].x.cols, ds[i].rows, ds[i].cols);
@@ -272,8 +241,6 @@ static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix t
             }
         }
     }
-    
-    free(ds);
     
     return 0;
 }

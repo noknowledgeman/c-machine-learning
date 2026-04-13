@@ -1,3 +1,4 @@
+#include "arena.h"
 #include <time.h>
 #include <math.h>
 #include <stdio.h>
@@ -185,11 +186,14 @@ int main(int argc, char *argv[]) {
     float learning_rate = 0.01*batch_size;
     
     
+    Arena perm_arena = arenaCreate();
+    Arena batch_arena = arenaCreate();
+    
     NeuralNetwork network = {0};
     NeuralNetwork gradients = {0};
 
     // just a one layer network with output 10
-    nnCreate(&network, 28*28, 1, 10);
+    nnArenaCreate(&network, &perm_arena, 28*28, 1, 10);
     
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     for (int l = 0; l < network.num_layers; l++) {
@@ -201,9 +205,9 @@ int main(int argc, char *argv[]) {
     }
     
     // training
-    Matrix in = matCreate(IMAGE_SIZE, 1);
-    Matrix out = matCreate(10, 1);
-    Matrix actual = matCreate(10, 1);
+    Matrix in = matArenaCreate(&perm_arena, IMAGE_SIZE, 1);
+    Matrix out = matArenaCreate(&perm_arena, 10, 1);
+    Matrix actual = matArenaCreate(&perm_arena, 10, 1);
     float accuracies[epochs];
     
     u32 indeces[training_images.num_images];
@@ -211,17 +215,21 @@ int main(int argc, char *argv[]) {
         indeces[i] = i;
     }
     
+    
     struct timespec start_time, end_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     for (int epoch = 0; epoch < epochs; epoch++) {
+        arenaReset(&batch_arena);
+        
         shuffleIndeces(indeces, training_images.num_images);
         for (int i = 0; i < (int)training_images.num_images/batch_size; i++) {
             if (i % 100 == 0) {
                 printf("Epoch %d, Batch %d\n", epoch, i);
             }
 
-            assert(nnZeroGradients(&network, &gradients) == 0);
+            assert(nnZeroGradients(&network, &gradients, &batch_arena) == 0);
 
+            // the batch
             for (int j = 0; j < batch_size && i*batch_size + j < training_images.num_images; j++) {
                 NeuralNetwork batch_gradients = {0};
                 batch_gradients.num_layers = network.num_layers;
@@ -234,19 +242,17 @@ int main(int argc, char *argv[]) {
                     in.data[k] = (float)image->data[k]/255.0;
                 }
                 
-                assert(nnForward(&network, &out, in) == 0);
+                assert(nnForward(&network, &out, in, &batch_arena) == 0);
                 actual.data[label] = 1.0;
-                assert(nnBackward(&network, &batch_gradients, actual) == 0);
+                assert(nnBackward(&network, &batch_gradients, actual, &batch_arena) == 0);
                 actual.data[label] = 0.0;
                 
                 nnAddGradients(&gradients, &batch_gradients);
-                nnDestroy(&batch_gradients);
             }
             nnScaleGradients(&gradients, 1.0/batch_size);
             
-            nnAddGradientsToNetwork(&network, &gradients, learning_rate);
-            nnDestroy(&gradients);
-            
+            nnAddGradientsToNetwork(&network, &gradients, &batch_arena, learning_rate);
+            arenaReset(&batch_arena);
         }
         //testing
         
@@ -260,7 +266,7 @@ int main(int argc, char *argv[]) {
                 in.data[j] = (float)image->data[j]/255.0;
             }
             
-            assert(nnForward(&network, &out, in) == 0);
+            assert(nnForward(&network, &out, in, &batch_arena) == 0);
             
             u32 max_idx;
             float curr_max = -1.0;
@@ -284,10 +290,8 @@ int main(int argc, char *argv[]) {
     freeLabelledImages(training_images);
     freeLabelledImages(test_images);
     
-    matDestroy(&actual);
-    matDestroy(&in);
-    matDestroy(&out);
-    nnDestroy(&network);
+    arenaDestroy(&batch_arena);
+    arenaDestroy(&perm_arena);
     
     return 0;
 }

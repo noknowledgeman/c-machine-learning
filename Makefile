@@ -1,4 +1,4 @@
-CFLAGS =  -pedantic -Wall -g
+CFLAGS = -pedantic -Wall -g
 # All the SRCS with implementationn
 SRCS = main.c arena.h neuralnetwork.h matrix.h
 

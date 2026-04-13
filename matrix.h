@@ -71,7 +71,7 @@ Matrix matDupe(Matrix a) {
 }
 
 Matrix matArenaCreate(Arena *arena, unsigned int rows, unsigned int cols) {
-    float *data = (float *)aaArenaAlloc(arena, rows*cols*sizeof(float));
+    float *data = (float *)arenaAlloc(arena, rows*cols*sizeof(float));
     
     if (data == NULL) {
         return (Matrix) {0};
@@ -85,7 +85,7 @@ Matrix matArenaCreate(Arena *arena, unsigned int rows, unsigned int cols) {
 }
 
 Matrix matArenaDupe(Arena *arena, Matrix a) {
-    Matrix ret = matCreate(a.rows, a.cols);
+    Matrix ret = matArenaCreate(arena, a.rows, a.cols);
     
     memcpy(ret.data, a.data, a.rows*a.cols*sizeof(float));
     return ret;
