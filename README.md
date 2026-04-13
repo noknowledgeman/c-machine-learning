@@ -43,6 +43,7 @@ Epoch 4: 82.330000%
 - [x] Plotting accuracies
 - [x] Batching (semi)
 - [x] Automatic dataset downloading
+- [x] Arena Allocation
 - [ ] Momentum
 - [ ] Adam
 - [ ] Regularization
