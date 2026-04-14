@@ -2,6 +2,7 @@
 #define MATRIX_H
 
 #include "arena.h"
+#include "logs.h"
 typedef struct Matrix {
     int rows;
     int cols;
@@ -91,20 +92,16 @@ Matrix matArenaDupe(Arena *arena, Matrix a) {
     return ret;
 }
 
+// #define USE_OPENBLAS
 #ifdef USE_OPENBLAS
 
 #include <cblas.h>
 
 // using cblas
 int matMul(Matrix *out, Matrix a, Matrix b) {
-    if (!(a.cols == b.rows)) {
-        fprintf(stderr, "a.cols and b.rows do not match\n");
-        return 1;
-    };
-    if (!(out->rows == a.rows && out->cols == b.cols)) {
-        fprintf(stderr, "the out size does not match\n");
-        return 1;
-    };
+    ASSERT(a.cols == b.rows, "a.cols and b.rows do not match");
+    ASSERT(out->rows == a.rows && out->cols == b.cols, "the out size does not match");
+    
     cblas_sgemm(
         CblasRowMajor, 
         CblasNoTrans, 
@@ -125,15 +122,8 @@ int matMul(Matrix *out, Matrix a, Matrix b) {
 
 // out should be initialized to the right size
 int matMul(Matrix *out, Matrix a, Matrix b) {
-    if (!(a.cols == b.rows)) {
-        fprintf(stderr, "a.cols and b.rows do not match\n");
-        return 1;
-    };
-    if (!(out->rows == a.rows && out->cols == b.cols)) {
-        fprintf(stderr, "the out size does not match\n");
-        return 1;
-    };
-
+    ASSERT(a.cols == b.rows, "a.cols and b.rows do not match");
+    ASSERT(out->rows == a.rows && out->cols == b.cols, "the out size does not match");
     
     for (int i = 0; i < a.rows; i++) {
         for (int j = 0; j < b.cols; j++) {
@@ -150,7 +140,7 @@ int matMul(Matrix *out, Matrix a, Matrix b) {
 #endif //USE_OPENBLAS
 
 int matScale(Matrix *out, Matrix a, float b) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
     
     for (int i = 0; i < a.cols*a.rows; i++) {
         out->data[i] = b*a.data[i];
@@ -160,8 +150,8 @@ int matScale(Matrix *out, Matrix a, float b) {
 }
 
 int matAdd(Matrix *out, Matrix a, Matrix b) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
-    if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    ASSERT(b.cols == a.cols && b.rows == a.rows, "b size does not match a size");
     
     for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] = a.data[i] + b.data[i];
@@ -171,8 +161,8 @@ int matAdd(Matrix *out, Matrix a, Matrix b) {
 }
 
 int matSub(Matrix *out, Matrix a, Matrix b) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
-    if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    ASSERT(b.cols == a.cols && b.rows == a.rows, "b size does not match a size");
     for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] = a.data[i] - b.data[i];
     }
@@ -180,7 +170,7 @@ int matSub(Matrix *out, Matrix a, Matrix b) {
 }
 
 int matTranspose(Matrix *out, Matrix a) {
-    if (!(out->cols == a.rows && out->rows == a.cols)) return 1;
+    ASSERT(out->cols == a.rows && out->rows == a.cols, "out size does not match a size");
     
     for (int i = 0; i < a.rows; i++) {
         for (int j = 0; j < a.cols; j++) {
@@ -192,8 +182,8 @@ int matTranspose(Matrix *out, Matrix a) {
 }
 
 int matProduct(Matrix *out, Matrix a, Matrix b) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
-    if (!(b.cols == a.cols && b.rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    ASSERT(b.cols == a.cols && b.rows == a.rows, "b size does not match a size");
     
     for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] = a.data[i]*b.data[i];
@@ -209,7 +199,7 @@ int matZero(Matrix *a) {
 }
 
 int matReLu(Matrix *out, Matrix a) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
     
     for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] = (a.data[i] > 0) ? a.data[i] : 0;
@@ -218,7 +208,7 @@ int matReLu(Matrix *out, Matrix a) {
 }
 
 int matReLuDer(Matrix *out, Matrix a) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
     
     for (int i = 0; i < a.rows*a.cols; i++) {
         out->data[i] = (a.data[i] > 0) ? 1 : 0;
@@ -228,7 +218,7 @@ int matReLuDer(Matrix *out, Matrix a) {
 }
 
 int matSoftMax(Matrix *out, Matrix a) {
-    if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
 
     float max_val = a.data[0];
     for (int i = 1; i < a.rows*a.cols; i++) {
