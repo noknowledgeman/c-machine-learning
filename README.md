@@ -27,6 +27,8 @@ With the layers 28*28 -> 256 -> 128 -> 10
 
 After 5 epochs 97.6%
 
+With OpenBLAS and network 28*28 -> 128 -> 10 47.13 seconds 97.11% accuracy
+
 ### Fashion MNIST
 
 Epoch 0: 72.439998%
@@ -44,6 +46,7 @@ Epoch 4: 82.330000%
 - [x] Batching (semi)
 - [x] Automatic dataset downloading
 - [x] Arena Allocation
+- [x] OpenBLAS on matMul
 - [ ] Momentum
 - [ ] Adam
 - [ ] Regularization
