@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
  
 typedef struct {
     // layer size x previous layer size
@@ -21,6 +22,8 @@ typedef struct {
     // x: input, z: weighted sum, a: activation
     // The input to the model would be x of the first layer and the output would be a of the last
     Matrix x, z, a;
+    
+    Matrix w_vels, b_vels;
 } Layer;
 
 typedef struct {
@@ -34,7 +37,6 @@ typedef struct {
 } NeuralNetwork;
 
 static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 num_layers, ...) {
-    
     network->num_layers = num_layers;
     if(num_layers > 5) return 1;
     
@@ -45,30 +47,29 @@ static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 
         u32 size = va_arg(args, u32);
         Matrix weights = matArenaCreate(arena, size, in_size);
         if (weights.data == NULL) return 1;
-        in_size = size;
-        
         network->layers[i].weights = weights;
+        
+        Matrix w_vels = matArenaCreate(arena, size, in_size);
+        if (w_vels.data == NULL) return 1;
+        matZero(&w_vels);
+        network->layers[i].w_vels = w_vels;
+        
+        in_size = size;
         
         Matrix biases = matArenaCreate(arena,size, 1);
         if (biases.data == NULL) return 1;
         network->layers[i].biases = biases;
+        
+        Matrix b_vels = matArenaCreate(arena, size, 1);
+        if (b_vels.data == NULL) return 1;
+        matZero(&b_vels);
+        network->layers[i].b_vels = b_vels;
     }
     
     va_end(args);
     
     return 0;
 }
-
-// static void nnDestroy(NeuralNetwork *network) {
-//     for (int i = 0; i < network->num_layers; i++) {
-//         Layer *current = &network->layers[i];
-//         matDestroy(&current->biases);
-//         matDestroy(&current->weights);
-//         matDestroy(&current->x);
-//         matDestroy(&current->z);
-//         matDestroy(&current->a);
-//     }
-// }
 
 // Allocates zero-initialized weight and bias matrices for use as a gradient accumulator
 static int nnZeroGradients(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena) {
@@ -159,15 +160,21 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in, Arena *aren
 // layers has to have the same length of network->num_layers
 static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena,  float learning_rate) {
     for (int i = 0; i < network->num_layers; i++) {
-        Layer n_layer = network->layers[i];
+        Layer *n_layer = network->layers + i;
         
-        Matrix temp = matArenaDupe(arena, gradients->layers[i].weights);
-        if (matScale(&temp, temp, learning_rate) != 0) return 1;
-        if (matSub(&n_layer.weights, n_layer.weights, temp) != 0) return 1;
+        if (matScale(&n_layer->w_vels, n_layer->w_vels, 0.9) != 0) return 1;
+        if (matAdd(&n_layer->w_vels, n_layer->w_vels, gradients->layers[i].weights) != 0) return 1;
         
-        temp = matArenaDupe(arena, gradients->layers[i].biases);
-        if (matScale(&temp, temp, learning_rate) != 0) return 1;
-        if (matSub(&n_layer.biases, n_layer.biases, temp) != 0) return 1;
+        Matrix tempw = matArenaDupe(arena, n_layer->w_vels);
+        if (matScale(&tempw, tempw, learning_rate) != 0) return 1;
+        if (matSub(&n_layer->weights, n_layer->weights, tempw) != 0) return 1;
+        
+        if (matScale(&n_layer->b_vels, n_layer->b_vels, 0.9) != 0) return 1;
+        if (matAdd(&n_layer->b_vels, n_layer->b_vels, gradients->layers[i].biases) != 0) return 1;
+        
+        Matrix tempb = matArenaDupe(arena, n_layer->b_vels);
+        if (matScale(&tempb, tempb, learning_rate) != 0) return 1;
+        if (matSub(&n_layer->biases, n_layer->biases, tempb) != 0) return 1;
     }
     
     return 0;

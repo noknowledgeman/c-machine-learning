@@ -47,7 +47,7 @@ Epoch 4: 82.330000%
 - [x] Automatic dataset downloading
 - [x] Arena Allocation
 - [x] OpenBLAS on matMul
-- [ ] Momentum
+- [x] Momentum
 - [ ] Adam
 - [ ] Regularization
 - [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)
@@ -55,6 +55,11 @@ Epoch 4: 82.330000%
 - [ ] Different activation functions
 - [ ] Convolutional neural networksk
 - [ ] GPU acceleration
+
+## Refactoring
+
+- The output field in the matrix multiplication does not need to be a reference
+- I dont like the bubbling up mechanic of errors anymore, combine with some logging mechanic
 
 ## Running
 
