@@ -76,8 +76,10 @@ static int nnZeroGradients(NeuralNetwork *network, NeuralNetwork *gradients, Are
     for (int i = 0; i < network->num_layers; i++) {
         gradients->layers[i].weights = matArenaCreate(arena, network->layers[i].weights.rows, network->layers[i].weights.cols);
         if (gradients->layers[i].weights.data == NULL) return 1;
+        matZero(&gradients->layers[i].weights);
         gradients->layers[i].biases = matArenaCreate(arena, network->layers[i].biases.rows, network->layers[i].biases.cols);
         if (gradients->layers[i].biases.data == NULL) return 1;
+        matZero(&gradients->layers[i].biases);
     }
     return 0;
 }

@@ -12,7 +12,10 @@ build-main: $(SRCS)
 	gcc $(CFLAGS) -fsanitize=address -o main main.c -lm
 	
 build-test: $(SRCS)
-	gcc $(CFLAGS) -O3 -ffast-math -o test main.c -lm
+	gcc $(CFLAGS) -O3 -ffast-math -march=native -o test main.c -lm
+	
+build-cblas: $(SRCS)
+	gcc $(CFLAGS) -O3 -ffast-math -march=native -DUSE_OPENBLAS -o cblas main.c -lm -lopenblas
 	
 leak: $(SRCS)
 	gcc -pedantic -Wall -g -o leak main.c -lm

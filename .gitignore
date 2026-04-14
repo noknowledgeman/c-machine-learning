@@ -2,5 +2,6 @@ datasets/*
 mnist-dataset.zip
 main
 test
+cblas
 
 vgcore.*

@@ -26,6 +26,7 @@ int matSub(Matrix *out, Matrix a, Matrix b);
 int matTranspose(Matrix *out, Matrix a);
 // [a, b]prod[d, e] = [a*d, b*e]
 int matProduct(Matrix *out, Matrix a, Matrix b);
+int matZero(Matrix *a);
 
 // not sure how to implement it yet
 int matSoftMax(Matrix *out, Matrix a);
@@ -35,7 +36,6 @@ int matReLuDer(Matrix *out, Matrix a);
 
 void matDebug(Matrix a);
 
-// #define MATRIX_IMPLEMENTATION
 #ifdef MATRIX_IMPLEMENTATION
 
 #include <stdlib.h>
@@ -91,6 +91,38 @@ Matrix matArenaDupe(Arena *arena, Matrix a) {
     return ret;
 }
 
+#ifdef USE_OPENBLAS
+
+#include <cblas.h>
+
+// using cblas
+int matMul(Matrix *out, Matrix a, Matrix b) {
+    if (!(a.cols == b.rows)) {
+        fprintf(stderr, "a.cols and b.rows do not match\n");
+        return 1;
+    };
+    if (!(out->rows == a.rows && out->cols == b.cols)) {
+        fprintf(stderr, "the out size does not match\n");
+        return 1;
+    };
+    cblas_sgemm(
+        CblasRowMajor, 
+        CblasNoTrans, 
+        CblasNoTrans, 
+        a.rows, 
+        b.cols, 
+        a.cols, 
+        1.0f, 
+        a.data, a.cols,
+        b.data, b.cols, 
+        1.0, 
+        out->data, out->cols
+    );
+    return 0;
+}
+
+#else
+
 // out should be initialized to the right size
 int matMul(Matrix *out, Matrix a, Matrix b) {
     if (!(a.cols == b.rows)) {
@@ -114,6 +146,8 @@ int matMul(Matrix *out, Matrix a, Matrix b) {
     
     return 0;
 }
+
+#endif //USE_OPENBLAS
 
 int matScale(Matrix *out, Matrix a, float b) {
     if (!(out->cols == a.cols && out->rows == a.rows)) return 1;
@@ -165,6 +199,12 @@ int matProduct(Matrix *out, Matrix a, Matrix b) {
         out->data[i] = a.data[i]*b.data[i];
     }
     
+    return 0;
+}
+
+int matZero(Matrix *a) {
+    if (a->data == NULL) return 1;
+    memset(a->data, 0, a->rows*a->cols*sizeof(float));
     return 0;
 }
 

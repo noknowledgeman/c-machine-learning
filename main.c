@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
     // activations
     int epochs = 5;
     int batch_size = 64;
-    float learning_rate = 0.01*batch_size;
+    float learning_rate = 0.002*batch_size;
     
     
     Arena perm_arena = arenaCreate();
@@ -208,6 +208,7 @@ int main(int argc, char *argv[]) {
     Matrix in = matArenaCreate(&perm_arena, IMAGE_SIZE, 1);
     Matrix out = matArenaCreate(&perm_arena, 10, 1);
     Matrix actual = matArenaCreate(&perm_arena, 10, 1);
+    matZero(&actual);
     float accuracies[epochs];
     
     u32 indeces[training_images.num_images];
@@ -268,7 +269,7 @@ int main(int argc, char *argv[]) {
             
             assert(nnForward(&network, &out, in, &batch_arena) == 0);
             
-            u32 max_idx;
+            u32 max_idx = 0;
             float curr_max = -1.0;
             for (int i = 0; i < 10; i++) {
                 if (curr_max < out.data[i]) {
