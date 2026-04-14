@@ -2,6 +2,7 @@
 #define ARENA_H
 
 #include <stddef.h> 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,6 +14,13 @@ typedef struct {
     size_t len;
     char *data;
 } Arena;
+
+typedef struct ArenaNode {
+    struct ArenaNode *next;
+    size_t cap;
+    size_t offset;
+    char data[];
+}  ArenaNode;
 
 // 0 initialized
 static Arena arenaCreate() {
@@ -26,9 +34,19 @@ static Arena arenaCreate() {
 
 // zero-initialized for now for convenience
 static void *arenaAlloc(Arena *arena, size_t size) {
-    if (arena->len + size > arena->cap) return NULL;
+    size_t align = alignof(max_align_t);
+    
+    uintptr_t current = (uintptr_t)(arena->data + arena->len);
+    uintptr_t aligned = (current + align - 1) & ~(align - 1);
+    
+    size_t padding = aligned - current;
+    
+    if (arena->len + padding + size > arena->cap) return NULL;
+    
+    arena->len += padding;
     size_t loc = arena->len;
     arena->len += size;
+    
     memset(arena->data + loc, 0, size);
     return arena->data + loc;
 }
