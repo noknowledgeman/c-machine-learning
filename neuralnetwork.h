@@ -3,9 +3,11 @@
 #define NEURALNETWORK_H
 
 #include "arena.h"
+#include "logs.h"
 #include "matrix.h"
 #include "types.h"
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +25,9 @@ typedef struct {
     // The input to the model would be x of the first layer and the output would be a of the last
     Matrix x, z, a;
     
-    Matrix w_vels, b_vels;
+    // for  Adam
+    Matrix w_m, w_v;
+    Matrix b_m, b_v;
 } Layer;
 
 typedef struct {
@@ -34,6 +38,9 @@ typedef struct {
     // Max 5 layers for now to avoid heap allocation
     Layer layers[5];
     int num_layers;
+    
+    // for Adam
+    int t;
 } NeuralNetwork;
 
 static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 num_layers, ...) {
@@ -49,10 +56,14 @@ static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 
         if (weights.data == NULL) return 1;
         network->layers[i].weights = weights;
         
-        Matrix w_vels = matArenaCreate(arena, size, in_size);
-        if (w_vels.data == NULL) return 1;
-        matZero(&w_vels);
-        network->layers[i].w_vels = w_vels;
+        Matrix w_m = matArenaCreate(arena, size, in_size);
+        if (w_m.data == NULL) return 1;
+        matZero(&w_m);
+        network->layers[i].w_m = w_m;
+        
+        Matrix w_v = matArenaDupe(arena, w_m);
+        if (w_v.data == NULL) return 1;
+        network->layers[i].w_v = w_v;
         
         in_size = size;
         
@@ -60,10 +71,14 @@ static int nnArenaCreate(NeuralNetwork *network, Arena *arena, u32 in_size, u32 
         if (biases.data == NULL) return 1;
         network->layers[i].biases = biases;
         
-        Matrix b_vels = matArenaCreate(arena, size, 1);
-        if (b_vels.data == NULL) return 1;
-        matZero(&b_vels);
-        network->layers[i].b_vels = b_vels;
+        Matrix b_v = matArenaCreate(arena, size, 1);
+        if (b_v.data == NULL) return 1;
+        matZero(&b_v);
+        network->layers[i].b_v = b_v;
+        
+        Matrix b_m = matArenaDupe(arena, b_v);
+        if (b_m.data == NULL) return 1;
+        network->layers[i].b_m = b_m;
     }
     
     va_end(args);
@@ -157,27 +172,74 @@ static int nnForward(NeuralNetwork *network, Matrix *out, Matrix in, Arena *aren
     return 0;
 }
 
-// layers has to have the same length of network->num_layers
-static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena,  float learning_rate) {
+
+static int nnOptAdam(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena, float lr, float beta1, float beta2, float eps) {
+    // updating the t
+    network->t++;
     for (int i = 0; i < network->num_layers; i++) {
-        Layer *n_layer = network->layers + i;
+        Layer *curr_layer = network->layers + i;
+        // implementing Adam
+        // 
+        Matrix w_g = gradients->layers[i].weights;
+        Matrix w_g2 = matArenaDupe(arena, w_g);
+        // gettingthe square
+        matProduct(&w_g2, w_g, w_g);
         
-        if (matScale(&n_layer->w_vels, n_layer->w_vels, 0.9) != 0) return 1;
-        if (matAdd(&n_layer->w_vels, n_layer->w_vels, gradients->layers[i].weights) != 0) return 1;
+        // updating w_m
+        matScale(&curr_layer->w_m, curr_layer->w_m, beta1);
+        matScale(&w_g, w_g, (1-beta1));
+        matAdd(&curr_layer->w_m, curr_layer->w_m, w_g);
         
-        Matrix tempw = matArenaDupe(arena, n_layer->w_vels);
-        if (matScale(&tempw, tempw, learning_rate) != 0) return 1;
-        if (matSub(&n_layer->weights, n_layer->weights, tempw) != 0) return 1;
+        // updating w_v
+        matScale(&curr_layer->w_v, curr_layer->w_v, beta2);
+        matScale(&w_g2, w_g2, (1-beta2));
+        matAdd(&curr_layer->w_v, curr_layer->w_v, w_g2);
         
-        if (matScale(&n_layer->b_vels, n_layer->b_vels, 0.9) != 0) return 1;
-        if (matAdd(&n_layer->b_vels, n_layer->b_vels, gradients->layers[i].biases) != 0) return 1;
+        // bias correction
+        Matrix w_mc = matArenaDupe(arena, curr_layer->w_m);
+        matScale(&w_mc, w_mc, 1.0/(1-powf(beta1, network->t)));
+        Matrix w_vc = matArenaDupe(arena, curr_layer->w_v);
+        matScale(&w_vc, w_vc, 1.0/(1-powf(beta2, network->t)));
         
-        Matrix tempb = matArenaDupe(arena, n_layer->b_vels);
-        if (matScale(&tempb, tempb, learning_rate) != 0) return 1;
-        if (matSub(&n_layer->biases, n_layer->biases, tempb) != 0) return 1;
+        matSqrt(&w_vc, w_vc);
+        matAddScalar(&w_vc, w_vc, eps);
+        matDiv(&w_mc, w_mc, w_vc);
+        matScale(&w_mc, w_mc, lr);
+        matSub(&curr_layer->weights, curr_layer->weights, w_mc);
+        
+        Matrix b_g = gradients->layers[i].biases;
+        Matrix b_g2 = matArenaDupe(arena, b_g);
+        matProduct(&b_g2, b_g, b_g);
+        
+        // updating b_m
+        matScale(&curr_layer->b_m, curr_layer->b_m, beta1);
+        matScale(&b_g, b_g, (1-beta1));
+        matAdd(&curr_layer->b_m, curr_layer->b_m, b_g);
+        
+        // updating b_v
+        matScale(&curr_layer->b_v, curr_layer->b_v, beta2);
+        matScale(&b_g2, b_g2, (1-beta2));
+        matAdd(&curr_layer->b_v, curr_layer->b_v, b_g2);
+        
+        // biases
+        Matrix b_mc = matArenaDupe(arena, curr_layer->b_m);
+        matScale(&b_mc, b_mc, 1.0/(1-powf(beta1, network->t)));
+        Matrix b_vc = matArenaDupe(arena, curr_layer->b_v);
+        matScale(&b_vc, b_vc, 1.0/(1-powf(beta2, network->t)));
+        
+        matSqrt(&b_vc, b_vc);
+        matAddScalar(&b_vc, b_vc, eps);
+        matDiv(&b_mc, b_mc, b_vc);
+        matScale(&b_mc, b_mc, lr);
+        matSub(&curr_layer->biases, curr_layer->biases, b_mc);
     }
-    
     return 0;
+}
+
+// layers has to have the same length of network->num_layers
+static int nnAddGradientsToNetwork(NeuralNetwork *network, NeuralNetwork *gradients, Arena *arena,  float lr) {
+    return nnOptAdam(network, gradients, arena, lr, 0.9, 0.999, 1e-8);
+    
 }
 
 static int nnBackward(NeuralNetwork *network, NeuralNetwork *gradients, Matrix target, Arena *arena) {

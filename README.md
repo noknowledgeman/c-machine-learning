@@ -49,7 +49,7 @@ Epoch 4: 82.330000%
 - [x] OpenBLAS on matMul
 - [x] Momentum
 - [ ] Adam
-- [ ] Convolutional neural networksk
+- [ ] Convolutional neural networks
 - [ ] Regularization
 - [ ] Saving a model to disk (Either a straight dump or look into compatible filetypes, like gguf or pth)
 - [ ] pthreads

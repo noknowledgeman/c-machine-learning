@@ -9,14 +9,10 @@ typedef struct Matrix {
     float *data;
 } Matrix;
 
-// return 0 on success 1 otherwise
-// 0 initialized
 Matrix matCreate(unsigned int rows, unsigned int cols);
 void matDestroy(Matrix *a);
 Matrix matDupe(Matrix a);
 
-// return 0 on success 1 otherwise
-// 0 initialized
 Matrix matArenaCreate(Arena *arena, unsigned int rows, unsigned int cols);
 Matrix matArenaDupe(Arena *arena, Matrix a);
 
@@ -27,7 +23,10 @@ int matSub(Matrix *out, Matrix a, Matrix b);
 int matTranspose(Matrix *out, Matrix a);
 // [a, b]prod[d, e] = [a*d, b*e]
 int matProduct(Matrix *out, Matrix a, Matrix b);
+int matDiv(Matrix *out, Matrix a, Matrix b);
 int matZero(Matrix *a);
+int matSqrt(Matrix *out, Matrix a);
+int matAddScalar(Matrix *out, Matrix a, float r);
 
 // not sure how to implement it yet
 int matSoftMax(Matrix *out, Matrix a);
@@ -37,6 +36,7 @@ int matReLuDer(Matrix *out, Matrix a);
 
 void matDebug(Matrix a);
 
+// #define MATRIX_IMPLEMENTATION
 #ifdef MATRIX_IMPLEMENTATION
 
 #include <stdlib.h>
@@ -192,9 +192,40 @@ int matProduct(Matrix *out, Matrix a, Matrix b) {
     return 0;
 }
 
+int matDiv(Matrix *out, Matrix a, Matrix b) {
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    ASSERT(b.cols == a.cols && b.rows == a.rows, "b size does not match a size");
+    
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = a.data[i]/b.data[i];
+    }
+    
+    return 0;
+}
+
 int matZero(Matrix *a) {
     if (a->data == NULL) return 1;
     memset(a->data, 0, a->rows*a->cols*sizeof(float));
+    return 0;
+}
+
+int matSqrt(Matrix *out, Matrix a) {
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = sqrtf(a.data[i]);
+    }
+    
+    return 0;
+}
+
+int matAddScalar(Matrix *out, Matrix a, float r) {
+    ASSERT(out->cols == a.cols && out->rows == a.rows, "out size does not match a size");
+    
+    for (int i = 0; i < a.rows*a.cols; i++) {
+        out->data[i] = a.data[i] + r;
+    }
+    
     return 0;
 }
 

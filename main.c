@@ -128,7 +128,7 @@ void shuffleIndeces(u32 *indeces, u32 num_indeces) {
 }
 
 void plotAccuracies(float *accuracies, u32 num_epochs) {
-    // lazy execution and only once
+    // lazy execution and only once, not really necessary as it is usually only called once, just future proofing
     static int term_width = -1;
     if (term_width == -1)  {
         struct winsize w;
@@ -183,8 +183,7 @@ int main(int argc, char *argv[]) {
     // activations
     int epochs = 5;
     int batch_size = 64;
-    float learning_rate = 0.002*batch_size;
-    
+    float learning_rate = 0.001;
     
     Arena perm_arena = arenaCreate();
     Arena batch_arena = arenaCreate();
@@ -193,7 +192,7 @@ int main(int argc, char *argv[]) {
     NeuralNetwork gradients = {0};
 
     // just a one layer network with output 10
-    nnArenaCreate(&network, &perm_arena, 28*28, 1, 10);
+    nnArenaCreate(&network, &perm_arena, 28*28, 2, 128, 10);
     
     // Xavier init: weights ~ U(-1/sqrt(fan_in), 1/sqrt(fan_in))
     for (int l = 0; l < network.num_layers; l++) {
